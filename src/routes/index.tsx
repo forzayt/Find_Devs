@@ -243,7 +243,7 @@ function FindDevs() {
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Code2 className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-normal">find<span className="text-primary">devs</span></span>
+            <span className="text-lg font-bold tracking-normal">Find<span className="text-primary">Devs</span></span>
             <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, live</span>
           </a>
           <div className="flex items-center gap-3">
