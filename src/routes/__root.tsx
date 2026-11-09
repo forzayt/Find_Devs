@@ -83,22 +83,61 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "FindDevs — See what developers are building" },
       { name: "description", content: "A live window into what developers are building across GitHub." },
-      { name: "author", content: "Lovable" },
+      { name: "author", content: "forzayt" },
+      // ── Theme & Browsing ──
+      { name: "theme-color", content: "#6763E8" },
+      { name: "robots", content: "index, follow" },
+      { name: "referrer-policy", content: "strict-origin-when-cross-origin" },
+      // ── Open Graph ──
       { property: "og:title", content: "FindDevs — See what developers are building" },
       { property: "og:description", content: "A live window into what developers are building across GitHub." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://find-devs-hub.vercel.app/" },
+      { property: "og:site_name", content: "FindDevs" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:locale:all", content: "en,es,pt,fr,de" },
+      { property: "og:article:published_time", content: "2024-01-01T00:00:00Z", typeof: "datetime" },
+      { property: "og:article:author", content: "forzayt" },
+      { property: "og:article:author.url", content: "https://forzayt.github.io/" },
+      { property: "og:app:site_name", content: "FindDevs" },
+      // ── Twitter Cards ──
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@forzayt" },
+      { name: "twitter:creator", content: "@forzayt" },
+      { name: "twitter:description", content: "A live window into what developers are building across GitHub." },
+      // ── Dublin Core ──
+      { name: "DC:creator", content: "forzayt" },
+      { name: "DC:keywords", content: "developers,github,open-source,projects,tech" },
+      // ── Microsoft Cards ──
+      { name: "msapplication:theme-color", content: "#6763E8" },
     ],
     links: [
+      // ── Preconnect for perf ──
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://images.unsplash.com" },
+      // ── Stylesheets ──
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
+      // ── Icons & Favicon ──
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/favicon.svg" },
+      { rel: "apple-touch-icon-size", href: "180x180" },
+      // ── Canonical & RSS ──
+      { rel: "canonical", href: "https://find-devs-hub.vercel.app/" },
+      { rel: "alternate", href: "https://find-devs-hub.vercel.app/feed.xml", type: "application/rss+xml", title: "FindDevs — RSS Feed" },
+      // ── Open Graph image (fallback for the root — each page should override) ──
+      { property: "og:image", content: "https://find-devs-hub.vercel.app/favicon.ico" },
+      { property: "og:image:alt", content: "FindDevs logo — Developer building showcase" },
+      // ── Twitter image (fallback) ──
+      { name: "twitter:image", content: "https://find-devs-hub.vercel.app/favicon.ico" },
+      // ── Preload ──
+      { rel: "preload", href: "/fonts/IBM+Plex+Mono.woff2", as: "font", type: "font/vnd.ms-fontobject", crossorigin: "anonymous" },
+      // ── Manifest (for PWA) ──
+      { rel: "manifest", href: "/manifest.json" },
+      // ── Web App: browser ──
+      { rel: "webapp:browser", href: "/manifest.json" },
     ],
   }),
   shellComponent: RootShell,

@@ -289,7 +289,7 @@ function FindDevs() {
             <div>
               <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" /> LIVE FROM GITHUB</div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">The dev feed</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">A pulse on what the community is shipping.</p>
+              <p className="mt-1.5 text-sm text-muted-foreground"> Keep rolling your eyes, maybe you'll find a brain back there.</p>
             </div>
             <div className="text-right text-xs text-muted-foreground">
               <p>{events.length ? `${events.length} recent activities` : "Public activity"}</p>
