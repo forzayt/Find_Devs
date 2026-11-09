@@ -28,3 +28,6 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Architecture
+- The Phase 1 activity feed is browser-only and reads GitHub's public REST API directly, keeping the experience usable without accounts, a database, or custom server code.
