@@ -38,7 +38,7 @@ const FILTERS: { label: FeedFilter; icon: typeof Activity }[] = [
   { label: "Pull Requests", icon: GitPullRequest },
   { label: "Releases", icon: Rocket },
 ];
-const REFRESH_FALLBACK_MS = 60_000;
+const REFRESH_FALLBACK_MS = 90_000;
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
   "CreateEvent",
