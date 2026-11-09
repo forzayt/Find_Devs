@@ -30,7 +30,7 @@ Find Devs is a single-page TanStack Start application. The server renders the sh
 The feed is designed to stay within GitHub's public API guidance:
 
 - **Server-provided interval** — reads `X-Poll-Interval` and waits at least that long between requests.
-- **Fallback interval** — `90s` when GitHub does not provide a poll interval.
+- **Fallback interval** — `60s` when GitHub does not provide a poll interval (GitHub's recommended minimum).
 - **Conditional requests** — sends the last `ETag` as `If-None-Match`; a `304 Not Modified` updates the "last checked" time without replacing the feed.
 - **Rate limiting** — on `403` with an exhausted `X-RateLimit-Remaining`, the UI shows a message and waits until `X-RateLimit-Reset`. On `429`, it honors `Retry-After`.
 - **Background tabs** — polling skips network requests while the page is hidden and resumes on the next scheduled check after the tab becomes visible.
