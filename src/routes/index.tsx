@@ -50,12 +50,12 @@ const SUPPORTED_EVENTS = new Set([
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "FindDevs — Live GitHub activity" },
+      { title: "FindDevs — See what developers are building" },
       {
         name: "description",
         content: "A live window into what developers are building across GitHub.",
       },
-      { property: "og:title", content: "FindDevs — Live GitHub activity" },
+      { property: "og:title", content: "FindDevs — See what developers are building" },
       {
         property: "og:description",
         content: "A live window into what developers are building across GitHub.",
