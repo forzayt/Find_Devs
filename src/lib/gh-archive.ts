@@ -153,11 +153,13 @@ export async function loadArchiveFeed(
     if (Date.now() >= deadline || signal?.aborted) break;
 
     const label = hourLabel(new Date(Date.now() - hoursAgo * HOUR_MS));
-    const events = await readHour(label, wanted, signal);
+    // Always keep the full window so a later request with a larger per_page
+    // can still be served from the cache.
+    const events = await readHour(label, ARCHIVE_LIMIT, signal);
     if (events?.length) {
       events.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
       cache = { label, storedAt: Date.now(), events };
-      return { label, events };
+      return { label, events: events.slice(0, wanted) };
     }
   }
 
