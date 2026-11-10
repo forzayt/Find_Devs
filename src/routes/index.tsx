@@ -32,6 +32,8 @@ type GithubEvent = {
 };
 
 const REFRESH_FALLBACK_MS = 180_000;
+const PAGE_TITLE = "FindDevs — See what developers are building";
+const INACTIVE_PAGE_TITLE = "get a life <3";
 const REVEAL_INTERVAL_MS = 1_000;
 const MAX_VISIBLE_EVENTS = 120;
 const MIN_VISIBLE_FEED_ROWS = 3;
@@ -61,7 +63,7 @@ function shuffled<T>(items: readonly T[]) {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "FindDevs — See what developers are building" },
+      { title: PAGE_TITLE },
       {
         name: "description",
         content: "A window into what developers are building across GitHub.",
@@ -93,6 +95,7 @@ function FindDevs() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
+  const interactionPausedRef = useRef(false);
   const queueRef = useRef<GithubEvent[]>([]);
   const poolRef = useRef<GithubEvent[]>([]);
   const seenRef = useRef(new Set<string>());
@@ -157,6 +160,34 @@ function FindDevs() {
     updateScrollTopVisibility();
     window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
+  }, []);
+
+  useEffect(() => {
+    const pauseForInactiveTab = () => {
+      pausedRef.current = true;
+      setPaused(true);
+      document.title = INACTIVE_PAGE_TITLE;
+    };
+    const restoreActiveTab = () => {
+      if (document.visibilityState === "hidden") return;
+      document.title = PAGE_TITLE;
+      pausedRef.current = interactionPausedRef.current;
+      setPaused(interactionPausedRef.current);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") pauseForInactiveTab();
+      else restoreActiveTab();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", pauseForInactiveTab);
+    window.addEventListener("focus", restoreActiveTab);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", pauseForInactiveTab);
+      window.removeEventListener("focus", restoreActiveTab);
+      document.title = PAGE_TITLE;
+    };
   }, []);
 
   const trendingRepoNames = useMemo(
@@ -366,11 +397,14 @@ function FindDevs() {
   };
 
   const pauseStream = () => {
+    interactionPausedRef.current = true;
     pausedRef.current = true;
     setPaused(true);
   };
 
   const resumeStream = () => {
+    interactionPausedRef.current = false;
+    if (document.visibilityState === "hidden" || !document.hasFocus()) return;
     pausedRef.current = false;
     setPaused(false);
   };
@@ -599,7 +633,7 @@ function FindDevs() {
 
           <section className="border-t border-border pt-6" aria-labelledby="contribute-title">
             <h2 id="contribute-title" className="text-sm font-semibold">
-              Looking to contribute to something?
+              Looking to contribute?
             </h2>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               Discover open-source projects that match your interests and skills.
