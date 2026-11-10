@@ -29,6 +29,7 @@ type GithubEvent = {
 const REFRESH_FALLBACK_MS = 180_000;
 const REVEAL_INTERVAL_MS = 1_000;
 const MAX_VISIBLE_EVENTS = 120;
+const MIN_VISIBLE_FEED_ROWS = 3;
 const FEED_ENDPOINT = "/api/events?per_page=500";
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
@@ -76,6 +77,7 @@ export const Route = createFileRoute("/")({
 
 function FindDevs() {
   const [events, setEvents] = useState<GithubEvent[]>([]);
+  const [fetchedEvents, setFetchedEvents] = useState<GithubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -121,7 +123,10 @@ function FindDevs() {
       // Shuffle each fetched batch so reloading the feed does not replay the
       // same activity in the same order.
       const incoming = shuffled(nextEvents);
-      if (incoming.length) poolRef.current = incoming;
+      if (incoming.length) {
+        poolRef.current = incoming;
+        setFetchedEvents(nextEvents);
+      }
 
       const fresh = incoming.filter((event) => !seenRef.current.has(event.id));
       for (const event of fresh) seenRef.current.add(event.id);
@@ -191,17 +196,21 @@ function FindDevs() {
 
   const developers = useMemo(() => {
     const seen = new Set<string>();
-    return events.filter((event) => {
-      if (seen.has(event.actor.login)) return false;
-      seen.add(event.actor.login);
-      return true;
-    }).slice(0, 5);
+    return events
+      .filter((event) => {
+        if (seen.has(event.actor.login)) return false;
+        seen.add(event.actor.login);
+        return true;
+      })
+      .slice(0, 5);
   }, [events]);
   const trendingRepos = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const event of events) counts.set(event.repo.name, (counts.get(event.repo.name) ?? 0) + 1);
+    for (const event of fetchedEvents) {
+      counts.set(event.repo.name, (counts.get(event.repo.name) ?? 0) + 1);
+    }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [events]);
+  }, [fetchedEvents]);
   const activityMix = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of events) {
@@ -210,6 +219,10 @@ function FindDevs() {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   }, [events]);
+  const pendingSkeletons = Math.max(
+    0,
+    Math.min(MIN_VISIBLE_FEED_ROWS, fetchedEvents.length) - events.length,
+  );
 
   const handleRefresh = () => {
     setRefreshKey((key) => key + 1);
@@ -234,11 +247,21 @@ function FindDevs() {
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Code2 className="size-5" />
             </span>
-            <span className="text-lg font-bold tracking-normal">Find<span className="text-primary">Devs</span></span>
-            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">Tracking the heartbeat of GitHub & see what's devs are cooking.</span>
+            <span className="text-lg font-bold tracking-normal">
+              Find<span className="text-primary">Devs</span>
+            </span>
+            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">
+              Tracking the heartbeat of GitHub & see what's devs are cooking.
+            </span>
           </a>
           <div className="flex items-center gap-3">
-            <a href="https://github.com/forzayt/Find_Devs" target="_blank" rel="noreferrer" aria-label="Fork FindDevs on GitHub" className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <a
+              href="https://github.com/forzayt/Find_Devs"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Fork FindDevs on GitHub"
+              className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
               <GitFork className="size-4" />
             </a>
           </div>
@@ -248,7 +271,9 @@ function FindDevs() {
       <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-0 px-4 sm:px-6 lg:grid-cols-[210px_minmax(0,1fr)_280px] lg:gap-7 lg:px-8">
         <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:h-[calc(100vh-68px)] lg:border-b-0 lg:py-7">
           <div className="hidden lg:block">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">ON FINDDEVS</p>
+            <p className="px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
+              ON FINDDEVS
+            </p>
             <div className="mt-3 flex items-start gap-3 px-3 text-xs leading-5 text-muted-foreground">
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
               <p>Open feed. Real work. Straight from GitHub.</p>
@@ -259,32 +284,69 @@ function FindDevs() {
         <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="relative flex size-2">{!paused && <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />}<span className="relative size-1.5 rounded-full bg-primary" /></span> {paused ? "PAUSED · GITHUB ARCHIVE" : "STREAMING LIVE · GITHUB ARCHIVE"}</div>
-              <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">The dev feed</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground"> Keep rolling your eyes, maybe you'll find a brain back there.</p>
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary">
+                <span className="relative flex size-2">
+                  {!paused && (
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
+                  )}
+                  <span className="relative size-1.5 rounded-full bg-primary" />
+                </span>{" "}
+                {paused ? "PAUSED · GITHUB ARCHIVE" : "STREAMING LIVE · GITHUB ARCHIVE"}
+              </div>
+              <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">
+                The dev feed
+              </h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {" "}
+                Keep rolling your eyes, maybe you'll find a brain back there.
+              </p>
             </div>
           </div>
 
           {error && (
-            <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
-              <p className="text-muted-foreground">{error} {events.length > 0 ? "Showing the latest activity we could load." : ""}</p>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>Try again</Button>
+            <div
+              role="alert"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm"
+            >
+              <p className="text-muted-foreground">
+                {error} {events.length > 0 ? "Showing the latest activity we could load." : ""}
+              </p>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                Try again
+              </Button>
             </div>
           )}
 
           {loading ? (
             <div className="space-y-3" aria-label="Loading activity" aria-busy="true">
-              {[0, 1, 2].map((item) => <FeedSkeleton key={item} />)}
+              {[0, 1, 2].map((item) => (
+                <FeedSkeleton key={item} />
+              ))}
             </div>
           ) : events.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center border border-dashed border-border px-6 text-center">
-              <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground"><Activity className="size-5" /></span>
-              <h2 className="font-medium">{error ? "The feed is taking a break" : events.length ? "Quiet on this channel" : "No public activity yet"}</h2>
-              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{error ? "GitHub Archive may be temporarily unavailable. Try again shortly." : events.length ? "New activity will show up as the archive streams." : "New activity will appear here as the archive arrives."}</p>
+              <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Activity className="size-5" />
+              </span>
+              <h2 className="font-medium">
+                {error
+                  ? "The feed is taking a break"
+                  : events.length
+                    ? "Quiet on this channel"
+                    : "No public activity yet"}
+              </h2>
+              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
+                {error
+                  ? "GitHub Archive may be temporarily unavailable. Try again shortly."
+                  : events.length
+                    ? "New activity will show up as the archive streams."
+                    : "New activity will appear here as the archive arrives."}
+              </p>
             </div>
           ) : (
             <div
               className="space-y-3"
+              aria-busy={pendingSkeletons > 0}
               onMouseEnter={pauseStream}
               onMouseLeave={resumeStream}
               onFocus={pauseStream}
@@ -294,7 +356,12 @@ function FindDevs() {
                 }
               }}
             >
-              {events.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
+              {events.map((event) => (
+                <ActivityCard key={event.id} event={event} now={now} />
+              ))}
+              {Array.from({ length: pendingSkeletons }, (_, index) => (
+                <FeedSkeleton key={`pending-${index}`} />
+              ))}
             </div>
           )}
         </section>
@@ -302,30 +369,104 @@ function FindDevs() {
         <aside className="hidden min-w-0 space-y-7 py-8 lg:block">
           <section aria-labelledby="trending-title">
             <div className="mb-4 flex items-center justify-between">
-              <h2 id="trending-title" className="text-sm font-semibold">Trending repositories</h2><ArrowUpRight className="size-4 text-muted-foreground" />
+              <h2 id="trending-title" className="text-sm font-semibold">
+                Trending repositories
+              </h2>
+              <ArrowUpRight className="size-4 text-muted-foreground" />
             </div>
-            {trendingRepos.length ? <ol className="space-y-1">{trendingRepos.map(([name, count], index) => <li key={name} className="flex items-start gap-3 py-2">
-              <span className="pt-0.5 font-mono text-xs text-muted-foreground">0{index + 1}</span>
-              <div className="min-w-0 flex-1"><a href={repoUrl(name)} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium hover:text-primary">{name}</a><p className="mt-1 text-[11px] text-muted-foreground">{count} recent {count === 1 ? "event" : "events"}</p></div>
-            </li>)}</ol> : <SidebarEmpty>Repos appear as they’re mentioned in the feed.</SidebarEmpty>}
+            {trendingRepos.length ? (
+              <ol className="space-y-1">
+                {trendingRepos.map(([name, count], index) => (
+                  <li key={name} className="flex items-start gap-3 py-2">
+                    <span className="pt-0.5 font-mono text-xs text-muted-foreground">
+                      0{index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        href={repoUrl(name)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-xs font-medium hover:text-primary"
+                      >
+                        {name}
+                      </a>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {count} recent {count === 1 ? "event" : "events"}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <SidebarEmpty>Repos appear as they’re mentioned in the feed.</SidebarEmpty>
+            )}
           </section>
 
           <section className="border-t border-border pt-6" aria-labelledby="developers-title">
-            <div className="mb-3 flex items-center justify-between"><h2 id="developers-title" className="text-sm font-semibold">Around the community</h2><Users className="size-4 text-muted-foreground" /></div>
-            {developers.length ? <ul className="space-y-3">{developers.map((event) => <li key={event.actor.login} className="flex items-center gap-2.5">
-              <Avatar className="size-8"><AvatarImage src={event.actor.avatar_url} alt="" /><AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-              <div className="min-w-0"><a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium hover:text-primary">{event.actor.login}</a><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{event.repo.name}</p></div>
-            </li>)}</ul> : <SidebarEmpty>Developers will show up with new activity.</SidebarEmpty>}
+            <div className="mb-3 flex items-center justify-between">
+              <h2 id="developers-title" className="text-sm font-semibold">
+                Around the community
+              </h2>
+              <Users className="size-4 text-muted-foreground" />
+            </div>
+            {developers.length ? (
+              <ul className="space-y-3">
+                {developers.map((event) => (
+                  <li key={event.actor.login} className="flex items-center gap-2.5">
+                    <Avatar className="size-8">
+                      <AvatarImage src={event.actor.avatar_url} alt="" />
+                      <AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <a
+                        href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-xs font-medium hover:text-primary"
+                      >
+                        {event.actor.login}
+                      </a>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {event.repo.name}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <SidebarEmpty>Developers will show up with new activity.</SidebarEmpty>
+            )}
           </section>
 
           <section className="border-t border-border pt-6" aria-labelledby="mix-title">
-            <div className="mb-4 flex items-center justify-between"><h2 id="mix-title" className="text-sm font-semibold">What’s happening</h2><Code2 className="size-4 text-muted-foreground" /></div>
-            {activityMix.length ? <ul className="space-y-3">{activityMix.map(([label, count], index) => <li key={label}>
-              <div className="mb-1.5 flex items-center justify-between text-xs"><span>{label}</span><span className="text-muted-foreground">{count} {count === 1 ? "event" : "events"}</span></div>
-              <div className="h-1 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full language-meter language-meter-${index}`} /></div>
-            </li>)}</ul> : <SidebarEmpty>Event types appear as activity arrives.</SidebarEmpty>}
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="mix-title" className="text-sm font-semibold">
+                What’s happening
+              </h2>
+              <Code2 className="size-4 text-muted-foreground" />
+            </div>
+            {activityMix.length ? (
+              <ul className="space-y-3">
+                {activityMix.map(([label, count], index) => (
+                  <li key={label}>
+                    <div className="mb-1.5 flex items-center justify-between text-xs">
+                      <span>{label}</span>
+                      <span className="text-muted-foreground">
+                        {count} {count === 1 ? "event" : "events"}
+                      </span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full language-meter language-meter-${index}`}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <SidebarEmpty>Event types appear as activity arrives.</SidebarEmpty>
+            )}
           </section>
-
         </aside>
       </div>
     </main>
@@ -340,7 +481,8 @@ function eventUrl(event: GithubEvent) {
   if (event.type === "PullRequestEvent" && pull?.html_url) return pull.html_url;
   if (event.type === "IssuesEvent" && issue?.html_url) return issue.html_url;
   if (event.type === "ReleaseEvent" && release?.html_url) return release.html_url;
-  if (event.type === "PushEvent" && typeof payload.head === "string") return `${repoUrl(event.repo.name)}/commit/${encodeURIComponent(payload.head)}`;
+  if (event.type === "PushEvent" && typeof payload.head === "string")
+    return `${repoUrl(event.repo.name)}/commit/${encodeURIComponent(payload.head)}`;
   return repoUrl(event.repo.name);
 }
 
@@ -351,32 +493,54 @@ function repoUrl(name: string) {
 function eventCopy(event: GithubEvent) {
   const payload = event.payload;
   if (event.type === "PushEvent") {
-    const ref = typeof payload.ref === "string" ? payload.ref.replace("refs/heads/", "") : "a branch";
+    const ref =
+      typeof payload.ref === "string" ? payload.ref.replace("refs/heads/", "") : "a branch";
     return { verb: "pushed to", title: ref, icon: GitCommitHorizontal, kind: "push" };
   }
   if (event.type === "CreateEvent") {
     const refType = typeof payload.ref_type === "string" ? payload.ref_type : "repository";
     const name = typeof payload.ref === "string" ? payload.ref : event.repo.name;
-    return { verb: "created a", title: refType === "repository" ? "new repository" : `${refType} ${name}`, icon: Box, kind: "create" };
+    return {
+      verb: "created a",
+      title: refType === "repository" ? "new repository" : `${refType} ${name}`,
+      icon: Box,
+      kind: "create",
+    };
   }
   if (event.type === "PullRequestEvent") {
     const pull = payload.pull_request as { title?: string; number?: number } | undefined;
     const action = typeof payload.action === "string" ? payload.action : "updated";
-    return { verb: `${action} a pull request in`, title: pull?.title ?? "Pull request", icon: GitPullRequest, kind: "pull" };
+    return {
+      verb: `${action} a pull request in`,
+      title: pull?.title ?? "Pull request",
+      icon: GitPullRequest,
+      kind: "pull",
+    };
   }
   if (event.type === "ReleaseEvent") {
     const release = payload.release as { name?: string; tag_name?: string } | undefined;
-    return { verb: "published a release in", title: release?.name || release?.tag_name || "New release", icon: Rocket, kind: "release" };
+    return {
+      verb: "published a release in",
+      title: release?.name || release?.tag_name || "New release",
+      icon: Rocket,
+      kind: "release",
+    };
   }
   const issue = payload.issue as { title?: string } | undefined;
   const action = typeof payload.action === "string" ? payload.action : "updated";
-  return { verb: `${action} an issue in`, title: issue?.title ?? "Issue", icon: CircleDot, kind: "issue" };
+  return {
+    verb: `${action} an issue in`,
+    title: issue?.title ?? "Issue",
+    icon: CircleDot,
+    kind: "issue",
+  };
 }
 
 function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   const copy = eventCopy(event);
   const Icon = copy.icon;
-  const branch = typeof event.payload.ref === "string" ? event.payload.ref.replace("refs/heads/", "") : "";
+  const branch =
+    typeof event.payload.ref === "string" ? event.payload.ref.replace("refs/heads/", "") : "";
   const head = typeof event.payload.head === "string" ? event.payload.head : "";
   const commits = Array.isArray(event.payload["commits"]) ? event.payload["commits"] : [];
   const firstCommit = commits[0] as { message?: string } | undefined;
@@ -387,23 +551,90 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   return (
     <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60 animate-in fade-in slide-in-from-top-1 duration-300">
       <div className="flex items-start gap-3.5 p-4 sm:p-5">
-        <a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" aria-label={`${event.actor.login} on GitHub`} className="mt-0.5 shrink-0">
-          <Avatar className="size-9"><AvatarImage src={event.actor.avatar_url} alt="" /><AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+        <a
+          href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${event.actor.login} on GitHub`}
+          className="mt-0.5 shrink-0"
+        >
+          <Avatar className="size-9">
+            <AvatarImage src={event.actor.avatar_url} alt="" />
+            <AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
         </a>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[13px] leading-5">
-            <a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" className="font-semibold hover:text-primary">{event.actor.login}</a>
+            <a
+              href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold hover:text-primary"
+            >
+              {event.actor.login}
+            </a>
             <span className="text-muted-foreground">{copy.verb}</span>
-            <a href={repoUrl(event.repo.name)} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">{event.repo.name}</a>
-            <time className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground" dateTime={time.toISOString()} title={time.toLocaleString()}>{relativeTime(time, now)}</time>
+            <a
+              href={repoUrl(event.repo.name)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-primary hover:underline"
+            >
+              {event.repo.name}
+            </a>
+            <time
+              className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground"
+              dateTime={time.toISOString()}
+              title={time.toLocaleString()}
+            >
+              {relativeTime(time, now)}
+            </time>
           </div>
-          <a href={eventUrl(event)} target="_blank" rel="noreferrer" className="mt-2 block text-sm font-medium leading-5 hover:text-primary">{copy.title}</a>
-          {event.type === "PushEvent" && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{cleanMessage ?? (head ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}` : branch ? `Updates to ${branch}` : "Pushed new changes")}</p>}
-          {event.type === "PullRequestEvent" && typeof event.payload.action === "string" && <p className="mt-2 text-xs text-muted-foreground">{event.payload.action === "opened" ? "A new contribution is ready for review." : "Pull request activity"}</p>}
+          <a
+            href={eventUrl(event)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 block text-sm font-medium leading-5 hover:text-primary"
+          >
+            {copy.title}
+          </a>
+          {event.type === "PushEvent" && (
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              {cleanMessage ??
+                (head
+                  ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}`
+                  : branch
+                    ? `Updates to ${branch}`
+                    : "Pushed new changes")}
+            </p>
+          )}
+          {event.type === "PullRequestEvent" && typeof event.payload.action === "string" && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {event.payload.action === "opened"
+                ? "A new contribution is ready for review."
+                : "Pull request activity"}
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium activity-kind activity-kind-${copy.kind}`}><Icon className="size-3" />{kindLabel(copy.kind)}</span>
-            {event.type === "PushEvent" && head && <span className="font-mono text-[10px] text-muted-foreground">{head.slice(0, 7)}</span>}
-            <a href={eventUrl(event)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-primary">View on GitHub <ArrowUpRight className="size-3" /></a>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium activity-kind activity-kind-${copy.kind}`}
+            >
+              <Icon className="size-3" />
+              {kindLabel(copy.kind)}
+            </span>
+            {event.type === "PushEvent" && head && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {head.slice(0, 7)}
+              </span>
+            )}
+            <a
+              href={eventUrl(event)}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-primary"
+            >
+              View on GitHub <ArrowUpRight className="size-3" />
+            </a>
           </div>
         </div>
       </div>
@@ -443,10 +674,19 @@ function relativeTime(date: Date, nowMs = Date.now()) {
 }
 
 function FeedSkeleton() {
-  return <div className="flex animate-pulse gap-3.5 rounded-lg border border-border bg-card p-5" aria-hidden="true">
-    <div className="size-9 shrink-0 rounded-full bg-muted" />
-    <div className="flex-1 space-y-3"><div className="h-3 w-3/4 rounded bg-muted" /><div className="h-3 w-1/2 rounded bg-muted" /><div className="h-3 w-2/3 rounded bg-muted" /></div>
-  </div>;
+  return (
+    <div
+      className="flex animate-pulse gap-3.5 rounded-lg border border-border bg-card p-5"
+      aria-hidden="true"
+    >
+      <div className="size-9 shrink-0 rounded-full bg-muted" />
+      <div className="flex-1 space-y-3">
+        <div className="h-3 w-3/4 rounded bg-muted" />
+        <div className="h-3 w-1/2 rounded bg-muted" />
+        <div className="h-3 w-2/3 rounded bg-muted" />
+      </div>
+    </div>
+  );
 }
 
 function SidebarEmpty({ children }: { children: React.ReactNode }) {
