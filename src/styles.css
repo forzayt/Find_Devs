@@ -154,3 +154,11 @@
     cursor: cell;
   }
 }
+
+/* Use the bundled cursor for every interactive target in the app. Unlayered on
+ * purpose, so it wins over the cursor utilities on buttons and links. */
+a,
+button,
+[role="button"] {
+  cursor: url("/links.cur"), pointer;
+}
