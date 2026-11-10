@@ -133,7 +133,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // ── Twitter image (fallback) ──
       { name: "twitter:image", content: "https://find-devs-hub.vercel.app/favicon.ico" },
       // ── Preload ──
-      { rel: "preload", href: "/fonts/IBM+Plex+Mono.woff2", as: "font", type: "font/vnd.ms-fontobject", crossorigin: "anonymous" },
+      { rel: "preload", href: "/fonts/IBM+Plex+Mono.woff2", as: "font", type: "font/vnd.ms-fontobject", crossOrigin: "anonymous" },
       // ── Manifest (for PWA) ──
       { rel: "manifest", href: "/manifest.json" },
       // ── Web App: browser ──
