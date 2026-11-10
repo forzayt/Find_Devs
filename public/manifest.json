@@ -1,0 +1,16 @@
+{
+  "name": "FindDevs",
+  "short_name": "FindDevs",
+  "description": "A live window into what developers are building across GitHub.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6763e8",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

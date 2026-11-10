@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiTrendingRouteImport } from './routes/api/trending'
+import { Route as ApiTrendingDevelopersRouteImport } from './routes/api/trending-developers'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +24,54 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
   path: '/api/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTrendingRoute = ApiTrendingRouteImport.update({
+  id: '/api/trending',
+  path: '/api/trending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTrendingDevelopersRoute = ApiTrendingDevelopersRouteImport.update({
+  id: '/api/trending-developers',
+  path: '/api/trending-developers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/trending': typeof ApiTrendingRoute
+  '/api/trending-developers': typeof ApiTrendingDevelopersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/trending': typeof ApiTrendingRoute
+  '/api/trending-developers': typeof ApiTrendingDevelopersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/trending': typeof ApiTrendingRoute
+  '/api/trending-developers': typeof ApiTrendingDevelopersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/events'
+  fullPaths: '/' | '/api/events' | '/api/trending' | '/api/trending-developers'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/events'
-  id: '__root__' | '/' | '/api/events'
+  to: '/' | '/api/events' | '/api/trending' | '/api/trending-developers'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/events'
+    | '/api/trending'
+    | '/api/trending-developers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiTrendingRoute: typeof ApiTrendingRoute
+  ApiTrendingDevelopersRoute: typeof ApiTrendingDevelopersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +90,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/trending': {
+      id: '/api/trending'
+      path: '/api/trending'
+      fullPath: '/api/trending'
+      preLoaderRoute: typeof ApiTrendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/trending-developers': {
+      id: '/api/trending-developers'
+      path: '/api/trending-developers'
+      fullPath: '/api/trending-developers'
+      preLoaderRoute: typeof ApiTrendingDevelopersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiTrendingRoute: ApiTrendingRoute,
+  ApiTrendingDevelopersRoute: ApiTrendingDevelopersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

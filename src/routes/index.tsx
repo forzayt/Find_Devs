@@ -16,6 +16,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { TrendingDeveloper } from "@/lib/github-trending-developers";
+import type { TrendingRepository } from "@/lib/github-trending";
 
 type GithubEvent = {
   id: string;
@@ -31,6 +33,11 @@ const REVEAL_INTERVAL_MS = 1_000;
 const MAX_VISIBLE_EVENTS = 120;
 const MIN_VISIBLE_FEED_ROWS = 3;
 const FEED_ENDPOINT = "/api/events?per_page=500";
+const TRENDING_ENDPOINT = "/api/trending";
+const TRENDING_CACHE_KEY = "finddevs:github-trending:v1";
+const TRENDING_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const DEVELOPERS_ENDPOINT = "/api/trending-developers";
+const DEVELOPERS_CACHE_KEY = "finddevs:github-trending-developers:v1";
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
   "CreateEvent",
@@ -38,14 +45,6 @@ const SUPPORTED_EVENTS = new Set([
   "ReleaseEvent",
   "IssuesEvent",
 ]);
-const MIX_LABELS: Record<string, string> = {
-  PushEvent: "Pushes",
-  CreateEvent: "New repositories",
-  PullRequestEvent: "Pull requests",
-  ReleaseEvent: "Releases",
-  IssuesEvent: "Issues",
-};
-
 function shuffled<T>(items: readonly T[]) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -83,6 +82,10 @@ function FindDevs() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [paused, setPaused] = useState(false);
+  const [trendingRepos, setTrendingRepos] = useState<TrendingRepository[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [developers, setDevelopers] = useState<TrendingDeveloper[]>([]);
+  const [developersLoading, setDevelopersLoading] = useState(true);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
   const queueRef = useRef<GithubEvent[]>([]);
@@ -165,6 +168,93 @@ function FindDevs() {
     };
   }, [refresh, refreshKey]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadTrending = async () => {
+      try {
+        const stored = localStorage.getItem(TRENDING_CACHE_KEY);
+        if (stored) {
+          const cached = JSON.parse(stored) as {
+            expiresAt?: number;
+            repositories?: TrendingRepository[];
+          };
+          if (
+            cached.expiresAt &&
+            cached.expiresAt > Date.now() &&
+            Array.isArray(cached.repositories)
+          ) {
+            setTrendingRepos(cached.repositories);
+            return;
+          }
+        }
+
+        const response = await fetch(TRENDING_ENDPOINT, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Trending repositories could not load (${response.status}).`);
+        }
+        const repositories = (await response.json()) as TrendingRepository[];
+        setTrendingRepos(repositories);
+        localStorage.setItem(
+          TRENDING_CACHE_KEY,
+          JSON.stringify({
+            expiresAt: Date.now() + TRENDING_CACHE_TTL_MS,
+            repositories,
+          }),
+        );
+      } catch (error) {
+        if (!controller.signal.aborted) console.error(error);
+      } finally {
+        if (!controller.signal.aborted) setTrendingLoading(false);
+      }
+    };
+
+    void loadTrending();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadDevelopers = async () => {
+      try {
+        const stored = localStorage.getItem(DEVELOPERS_CACHE_KEY);
+        if (stored) {
+          const cached = JSON.parse(stored) as {
+            expiresAt?: number;
+            developers?: TrendingDeveloper[];
+          };
+          if (
+            cached.expiresAt &&
+            cached.expiresAt > Date.now() &&
+            Array.isArray(cached.developers)
+          ) {
+            setDevelopers(cached.developers);
+            return;
+          }
+        }
+
+        const response = await fetch(DEVELOPERS_ENDPOINT, { signal: controller.signal });
+        if (!response.ok)
+          throw new Error(`Trending developers could not load (${response.status}).`);
+        const nextDevelopers = (await response.json()) as TrendingDeveloper[];
+        setDevelopers(nextDevelopers);
+        localStorage.setItem(
+          DEVELOPERS_CACHE_KEY,
+          JSON.stringify({
+            expiresAt: Date.now() + TRENDING_CACHE_TTL_MS,
+            developers: nextDevelopers,
+          }),
+        );
+      } catch (error) {
+        if (!controller.signal.aborted) console.error(error);
+      } finally {
+        if (!controller.signal.aborted) setDevelopersLoading(false);
+      }
+    };
+
+    void loadDevelopers();
+    return () => controller.abort();
+  }, []);
+
   // GitHub Archive only publishes once an hour, so the feed is replayed at a
   // human pace: one queued event every second, plus a clock tick that keeps
   // relative timestamps moving. When the batch runs out, it loops from the
@@ -194,31 +284,6 @@ function FindDevs() {
     return () => clearInterval(timer);
   }, []);
 
-  const developers = useMemo(() => {
-    const seen = new Set<string>();
-    return events
-      .filter((event) => {
-        if (seen.has(event.actor.login)) return false;
-        seen.add(event.actor.login);
-        return true;
-      })
-      .slice(0, 5);
-  }, [events]);
-  const trendingRepos = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const event of fetchedEvents) {
-      counts.set(event.repo.name, (counts.get(event.repo.name) ?? 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [fetchedEvents]);
-  const activityMix = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const event of events) {
-      const label = MIX_LABELS[event.type] ?? "Other";
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [events]);
   const pendingSkeletons = Math.max(
     0,
     Math.min(MIN_VISIBLE_FEED_ROWS, fetchedEvents.length) - events.length,
@@ -374,31 +439,42 @@ function FindDevs() {
               </h2>
               <ArrowUpRight className="size-4 text-muted-foreground" />
             </div>
-            {trendingRepos.length ? (
+            {trendingLoading ? (
+              <div
+                className="space-y-3"
+                aria-label="Loading trending repositories"
+                aria-busy="true"
+              >
+                {[0, 1, 2, 3].map((item) => (
+                  <TrendingSkeleton key={item} />
+                ))}
+              </div>
+            ) : trendingRepos.length ? (
               <ol className="space-y-1">
-                {trendingRepos.map(([name, count], index) => (
-                  <li key={name} className="flex items-start gap-3 py-2">
+                {trendingRepos.slice(0, 4).map((repository, index) => (
+                  <li key={repository.name} className="flex items-start gap-3 py-2">
                     <span className="pt-0.5 font-mono text-xs text-muted-foreground">
                       0{index + 1}
                     </span>
                     <div className="min-w-0 flex-1">
                       <a
-                        href={repoUrl(name)}
+                        href={repoUrl(repository.name)}
                         target="_blank"
                         rel="noreferrer"
                         className="block truncate text-xs font-medium hover:text-primary"
                       >
-                        {name}
+                        {repository.name}
                       </a>
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        {count} recent {count === 1 ? "event" : "events"}
+                        {repository.starsToday.toLocaleString()} stars today
+                        {repository.language ? ` · ${repository.language}` : ""}
                       </p>
                     </div>
                   </li>
                 ))}
               </ol>
             ) : (
-              <SidebarEmpty>Repos appear as they’re mentioned in the feed.</SidebarEmpty>
+              <SidebarEmpty>GitHub Trending is unavailable right now.</SidebarEmpty>
             )}
           </section>
 
@@ -409,62 +485,39 @@ function FindDevs() {
               </h2>
               <Users className="size-4 text-muted-foreground" />
             </div>
-            {developers.length ? (
+            {developersLoading ? (
+              <div className="space-y-3" aria-label="Loading trending developers" aria-busy="true">
+                {[0, 1, 2, 3, 4].map((item) => (
+                  <DeveloperSkeleton key={item} />
+                ))}
+              </div>
+            ) : developers.length ? (
               <ul className="space-y-3">
-                {developers.map((event) => (
-                  <li key={event.actor.login} className="flex items-center gap-2.5">
+                {developers.slice(0, 5).map((developer) => (
+                  <li key={developer.login} className="flex items-center gap-2.5">
                     <Avatar className="size-8">
-                      <AvatarImage src={event.actor.avatar_url} alt="" />
-                      <AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={developer.avatarUrl} alt="" />
+                      <AvatarFallback>{developer.login.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <a
-                        href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
+                        href={`https://github.com/${encodeURIComponent(developer.login)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="block truncate text-xs font-medium hover:text-primary"
                       >
-                        {event.actor.login}
+                        {developer.name || developer.login}
                       </a>
                       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        {event.repo.name}
+                        @{developer.login}
+                        {developer.popularRepository ? ` · ${developer.popularRepository}` : ""}
                       </p>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <SidebarEmpty>Developers will show up with new activity.</SidebarEmpty>
-            )}
-          </section>
-
-          <section className="border-t border-border pt-6" aria-labelledby="mix-title">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 id="mix-title" className="text-sm font-semibold">
-                What’s happening
-              </h2>
-              <Code2 className="size-4 text-muted-foreground" />
-            </div>
-            {activityMix.length ? (
-              <ul className="space-y-3">
-                {activityMix.map(([label, count], index) => (
-                  <li key={label}>
-                    <div className="mb-1.5 flex items-center justify-between text-xs">
-                      <span>{label}</span>
-                      <span className="text-muted-foreground">
-                        {count} {count === 1 ? "event" : "events"}
-                      </span>
-                    </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full language-meter language-meter-${index}`}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <SidebarEmpty>Event types appear as activity arrives.</SidebarEmpty>
+              <SidebarEmpty>GitHub Trending Developers is unavailable right now.</SidebarEmpty>
             )}
           </section>
         </aside>
@@ -684,6 +737,30 @@ function FeedSkeleton() {
         <div className="h-3 w-3/4 rounded bg-muted" />
         <div className="h-3 w-1/2 rounded bg-muted" />
         <div className="h-3 w-2/3 rounded bg-muted" />
+      </div>
+    </div>
+  );
+}
+
+function TrendingSkeleton() {
+  return (
+    <div className="flex animate-pulse gap-3 py-1" aria-hidden="true">
+      <div className="h-3 w-4 rounded bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-3/4 rounded bg-muted" />
+        <div className="h-2.5 w-1/2 rounded bg-muted" />
+      </div>
+    </div>
+  );
+}
+
+function DeveloperSkeleton() {
+  return (
+    <div className="flex animate-pulse items-center gap-2.5" aria-hidden="true">
+      <div className="size-8 shrink-0 rounded-full bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-1/2 rounded bg-muted" />
+        <div className="h-2.5 w-3/4 rounded bg-muted" />
       </div>
     </div>
   );
