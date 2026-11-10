@@ -6,11 +6,10 @@ import {
   Box,
   CircleDot,
   Code2,
-  GitBranch,
   GitCommitHorizontal,
+  GitFork,
   GitPullRequest,
   Radio,
-  RefreshCw,
   Rocket,
   Users,
 } from "lucide-react";
@@ -37,7 +36,9 @@ const FILTERS: { label: FeedFilter; icon: typeof Activity }[] = [
   { label: "Releases", icon: Rocket },
 ];
 const REFRESH_FALLBACK_MS = 180_000;
-const FEED_ENDPOINT = "/api/events?per_page=100";
+const REVEAL_INTERVAL_MS = 1_000;
+const MAX_VISIBLE_EVENTS = 120;
+const FEED_ENDPOINT = "/api/events?per_page=500";
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
   "CreateEvent",
@@ -77,15 +78,16 @@ function FindDevs() {
   const [events, setEvents] = useState<GithubEvent[]>([]);
   const [filter, setFilter] = useState<FeedFilter>("All");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [nextRefreshAt, setNextRefreshAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [queued, setQueued] = useState(0);
   const etagRef = useRef("");
+  const queueRef = useRef<GithubEvent[]>([]);
+  const seenRef = useRef(new Set<string>());
 
   const refresh = useCallback(async (signal: AbortSignal) => {
-    setRefreshing(true);
     setError("");
     let pollMs = REFRESH_FALLBACK_MS;
     try {
@@ -102,7 +104,6 @@ function FindDevs() {
       }
 
       if (response.status === 304) {
-        setLastUpdated(new Date());
         return pollMs;
       }
 
@@ -116,9 +117,20 @@ function FindDevs() {
       const nextEvents = Array.isArray(body)
         ? (body as GithubEvent[]).filter((event) => SUPPORTED_EVENTS.has(event.type))
         : [];
-      setEvents(nextEvents);
-      setLastUpdated(new Date());
-      setLoading(false);
+
+      // Queue only unseen events, oldest first. The reveal timer below surfaces
+      // them one per second, so each new card lands at the top just like a live
+      // feed catching up in real time.
+      const fresh = nextEvents.filter((event) => !seenRef.current.has(event.id));
+      for (const event of fresh) seenRef.current.add(event.id);
+      if (fresh.length) {
+        const incoming = [...fresh].sort(
+          (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
+        );
+        queueRef.current.push(...incoming);
+        setQueued(queueRef.current.length);
+      }
+      if (!nextEvents.length) setLoading(false);
       return pollMs;
     } catch (caught) {
       if (!signal.aborted) {
@@ -126,8 +138,6 @@ function FindDevs() {
         setLoading(false);
       }
       return pollMs;
-    } finally {
-      if (!signal.aborted) setRefreshing(false);
     }
   }, []);
 
@@ -153,6 +163,26 @@ function FindDevs() {
       if (timer) clearTimeout(timer);
     };
   }, [refresh, refreshKey]);
+
+  // GitHub Archive only publishes once an hour, so the feed is replayed at a
+  // human pace: one queued event every second, plus a clock tick that keeps
+  // relative timestamps and the "updated" label moving.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      const next = queueRef.current.shift();
+      if (next) {
+        setEvents((current) => {
+          const merged = [...current, next];
+          merged.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+          return merged.slice(0, MAX_VISIBLE_EVENTS);
+        });
+        setLoading(false);
+      }
+      setQueued(queueRef.current.length);
+    }, REVEAL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   const visibleEvents = useMemo(
     () => events.filter((event) => matchesFilter(event, filter)),
@@ -194,19 +224,11 @@ function FindDevs() {
               <Code2 className="size-5" />
             </span>
             <span className="text-lg font-bold tracking-normal">Find<span className="text-primary">Devs</span></span>
-            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, archived hourly</span>
+            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, streaming live</span>
           </a>
           <div className="flex items-center gap-3">
-            <span className="hidden items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
-              <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" /><span className="relative size-2 rounded-full bg-primary" /></span>
-              PUBLIC NETWORK
-            </span>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} aria-label="Refresh activity">
-              <RefreshCw className={refreshing ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-            <a href="https://github.com" target="_blank" rel="noreferrer" aria-label="Visit GitHub" className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-              <GitBranch className="size-4" />
+            <a href="https://github.com/forzayt/Find_Devs" target="_blank" rel="noreferrer" aria-label="Fork FindDevs on GitHub" className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+              <GitFork className="size-4" />
             </a>
           </div>
         </div>
@@ -237,13 +259,9 @@ function FindDevs() {
         <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" /> FROM THE GITHUB ARCHIVE</div>
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" /><span className="relative size-1.5 rounded-full bg-primary" /></span> STREAMING LIVE · GITHUB ARCHIVE</div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">The dev feed</h1>
               <p className="mt-1.5 text-sm text-muted-foreground"> Keep rolling your eyes, maybe you'll find a brain back there.</p>
-            </div>
-            <div className="text-right text-xs text-muted-foreground">
-              <p>{events.length ? `${events.length} recent activities` : "Public activity"}</p>
-              <p className="mt-1">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connecting to GitHub Archive…"}</p>
             </div>
           </div>
 
@@ -275,12 +293,12 @@ function FindDevs() {
             </div>
           ) : (
             <div className="space-y-3">
-              {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} />)}
+              {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
             </div>
           )}
-          <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
-            <span>Public events archived by <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-foreground hover:underline">GitHub Archive</a></span>
-            <span>{nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
+            <span>Public events archived by <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-foreground hover:underline">GitHub Archive</a> · replayed at 1 event/second</span>
+            <span>{queued > 0 ? `${queued} events queued` : nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
           </div>
         </section>
 
@@ -370,7 +388,7 @@ function eventCopy(event: GithubEvent) {
   return { verb: `${action} an issue in`, title: issue?.title ?? "Issue", icon: CircleDot, kind: "issue" };
 }
 
-function ActivityCard({ event }: { event: GithubEvent }) {
+function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   const copy = eventCopy(event);
   const Icon = copy.icon;
   const branch = typeof event.payload.ref === "string" ? event.payload.ref.replace("refs/heads/", "") : "";
@@ -380,7 +398,7 @@ function ActivityCard({ event }: { event: GithubEvent }) {
   const cleanMessage = firstCommit?.message?.split("\n")[0];
   const time = new Date(event.created_at);
   return (
-    <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60">
+    <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60 animate-in fade-in slide-in-from-top-1 duration-300">
       <div className="flex items-start gap-3.5 p-4 sm:p-5">
         <a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" aria-label={`${event.actor.login} on GitHub`} className="mt-0.5 shrink-0">
           <Avatar className="size-9"><AvatarImage src={event.actor.avatar_url} alt="" /><AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
@@ -390,7 +408,7 @@ function ActivityCard({ event }: { event: GithubEvent }) {
             <a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" className="font-semibold hover:text-primary">{event.actor.login}</a>
             <span className="text-muted-foreground">{copy.verb}</span>
             <a href={repoUrl(event.repo.name)} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">{event.repo.name}</a>
-            <time className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground" dateTime={event.created_at} title={time.toLocaleString()}>{relativeTime(time)}</time>
+            <time className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground" dateTime={event.created_at} title={time.toLocaleString()}>{relativeTime(time, now)}</time>
           </div>
           <a href={eventUrl(event)} target="_blank" rel="noreferrer" className="mt-2 block text-sm font-medium leading-5 hover:text-primary">{copy.title}</a>
           {event.type === "PushEvent" && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{cleanMessage ?? (head ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}` : branch ? `Updates to ${branch}` : "Pushed new changes")}</p>}
@@ -414,8 +432,8 @@ function kindLabel(kind: string) {
   return "ISSUE";
 }
 
-function relativeTime(date: Date) {
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+function relativeTime(date: Date, nowMs = Date.now()) {
+  const seconds = Math.max(0, Math.floor((nowMs - date.getTime()) / 1000));
   if (seconds < 60) return "now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;

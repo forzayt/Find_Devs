@@ -8,8 +8,8 @@ export const Route = createFileRoute("/api/events")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const requested = Number(new URL(request.url).searchParams.get("per_page") ?? "100");
-        const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : 100;
+        const requested = Number(new URL(request.url).searchParams.get("per_page") ?? "500");
+        const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 500) : 500;
 
         const feed = await loadArchiveFeed(limit, request.signal);
         if (!feed) {

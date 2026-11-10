@@ -14,7 +14,9 @@ export type ArchiveEvent = {
 
 const ARCHIVE_BASE = "https://data.gharchive.org";
 const ARCHIVE_HOURS_BACK = 4;
-const ARCHIVE_LIMIT = 100;
+// The client reveals one event per second, so keep a batch large enough to
+// stream for several minutes before the next archive hour lands.
+const ARCHIVE_LIMIT = 500;
 
 const HOUR_MS = 60 * 60 * 1000;
 const HOUR_TIMEOUT_MS = 12_000;

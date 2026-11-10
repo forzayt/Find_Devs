@@ -27,8 +27,9 @@ Find Devs is a single-page TanStack Start application. The server renders the sh
 
 ### Freshness and polling
 
-GitHub Archive publishes each hour's events shortly after the hour ends, so the feed trails GitHub by roughly one to two hours.
+GitHub Archive publishes each hour's events shortly after the hour ends, so the archived data trails GitHub by roughly one to two hours. To keep the page moving in the meantime, the client queues each batch of archived events and reveals them one per second — the feed visibly streams new cards every second while the underlying hour is a replay.
 
+- **Reveal rate** — one queued event per second, so a 500-event batch streams for over eight minutes.
 - **Polling interval** — the feed endpoint advertises `X-Poll-Interval: 180`; the client waits at least three minutes between checks.
 - **Conditional requests** — the endpoint returns an `ETag`; a matching `If-None-Match` yields `304 Not Modified` without re-reading the archive.
 - **Server-side cache** — the parsed hour is reused for five minutes.
