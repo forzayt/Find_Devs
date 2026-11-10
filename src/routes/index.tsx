@@ -651,14 +651,47 @@ function FindDevs() {
 
 function eventUrl(event: GithubEvent) {
   const payload = event.payload;
-  const pull = payload.pull_request as { html_url?: string } | undefined;
-  const issue = payload.issue as { html_url?: string } | undefined;
-  const release = payload.release as { html_url?: string } | undefined;
-  if (event.type === "PullRequestEvent" && pull?.html_url) return pull.html_url;
-  if (event.type === "IssuesEvent" && issue?.html_url) return issue.html_url;
-  if (event.type === "ReleaseEvent" && release?.html_url) return release.html_url;
-  if (event.type === "PushEvent" && typeof payload.head === "string")
-    return `${repoUrl(event.repo.name)}/commit/${encodeURIComponent(payload.head)}`;
+  const pull = payload.pull_request as { html_url?: string; number?: number } | undefined;
+  const issue = payload.issue as { html_url?: string; number?: number } | undefined;
+  const release = payload.release as { html_url?: string; tag_name?: string } | undefined;
+  if (event.type === "PullRequestEvent") {
+    if (pull?.html_url) return pull.html_url;
+    const pullNumber =
+      typeof payload.number === "number"
+        ? payload.number
+        : typeof pull?.number === "number"
+          ? pull.number
+          : undefined;
+    if (pullNumber) return `${repoUrl(event.repo.name)}/pull/${pullNumber}`;
+  }
+  if (event.type === "IssuesEvent") {
+    if (issue?.html_url) return issue.html_url;
+    const issueNumber =
+      typeof payload.number === "number"
+        ? payload.number
+        : typeof issue?.number === "number"
+          ? issue.number
+          : undefined;
+    if (issueNumber) return `${repoUrl(event.repo.name)}/issues/${issueNumber}`;
+  }
+  if (event.type === "ReleaseEvent") {
+    if (release?.html_url) return release.html_url;
+    if (release?.tag_name) {
+      return `${repoUrl(event.repo.name)}/releases/tag/${encodeURIComponent(release.tag_name)}`;
+    }
+  }
+  if (event.type === "PushEvent") {
+    if (typeof payload.head === "string") {
+      return `${repoUrl(event.repo.name)}/commit/${encodeURIComponent(payload.head)}`;
+    }
+    if (typeof payload.ref === "string") {
+      const branch = payload.ref.replace("refs/heads/", "");
+      return `${repoUrl(event.repo.name)}/tree/${encodeURIComponent(branch)}`;
+    }
+  }
+  if (event.type === "CreateEvent" && typeof payload.ref === "string") {
+    return `${repoUrl(event.repo.name)}/tree/${encodeURIComponent(payload.ref)}`;
+  }
   return repoUrl(event.repo.name);
 }
 
@@ -792,12 +825,16 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
             </p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium activity-kind activity-kind-${copy.kind}`}
+            <a
+              href={eventUrl(event)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${kindLabel(copy.kind).toLowerCase()}: ${copy.title}`}
+              className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium transition-[opacity,transform] hover:opacity-80 active:scale-[0.96] activity-kind activity-kind-${copy.kind}`}
             >
               <Icon className="size-3" />
               {kindLabel(copy.kind)}
-            </span>
+            </a>
             {event.type === "PushEvent" && head && (
               <span className="font-mono text-[10px] text-muted-foreground">
                 {head.slice(0, 7)}
