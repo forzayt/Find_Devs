@@ -3,6 +3,7 @@ export type TrendingRepository = {
   description: string;
   language: string;
   starsToday: number;
+  totalStars: number;
 };
 
 const TRENDING_URL = "https://github.com/trending?since=daily";
@@ -41,6 +42,12 @@ export function parseTrendingRepositories(html: string): TrendingRepository[] {
     );
     const languageMatch = article.match(/itemprop="programmingLanguage"[^>]*>([\s\S]*?)<\//i);
     const starsMatch = article.match(/([\d,]+)\s+stars?\s+today/i);
+    const totalStarsContent = article.match(
+      /<a\b(?=[^>]*href="\/[^"]+\/stargazers")[^>]*>([\s\S]*?)<\/a>/i,
+    )?.[1];
+    const totalStarsMatch = totalStarsContent
+      ? textContent(totalStarsContent).match(/[\d,]+/)
+      : null;
 
     return [
       {
@@ -48,6 +55,7 @@ export function parseTrendingRepositories(html: string): TrendingRepository[] {
         description: descriptionMatch ? textContent(descriptionMatch[1]) : "",
         language: languageMatch ? textContent(languageMatch[1]) : "",
         starsToday: starsMatch ? Number(starsMatch[1].replace(/,/g, "")) : 0,
+        totalStars: totalStarsMatch ? Number(totalStarsMatch[0].replace(/,/g, "")) : 0,
       },
     ];
   });

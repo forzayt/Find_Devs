@@ -10,8 +10,10 @@ import {
   GitCommitHorizontal,
   GitFork,
   GitPullRequest,
+  Pause,
   Radio,
   Rocket,
+  Star,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -34,8 +36,8 @@ const REVEAL_INTERVAL_MS = 1_000;
 const MAX_VISIBLE_EVENTS = 120;
 const MIN_VISIBLE_FEED_ROWS = 3;
 const FEED_ENDPOINT = "/api/events?per_page=500";
-const TRENDING_ENDPOINT = "/api/trending";
-const TRENDING_CACHE_KEY = "finddevs:github-trending:v1";
+const TRENDING_ENDPOINT = "/api/trending?schema=2";
+const TRENDING_CACHE_KEY = "finddevs:github-trending:v4";
 const TRENDING_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEVELOPERS_ENDPOINT = "/api/trending-developers";
 const DEVELOPERS_CACHE_KEY = "finddevs:github-trending-developers:v1";
@@ -201,7 +203,13 @@ function FindDevs() {
         if (!response.ok) {
           throw new Error(`Trending repositories could not load (${response.status}).`);
         }
-        const repositories = (await response.json()) as TrendingRepository[];
+        const repositories = ((await response.json()) as TrendingRepository[]).map(
+          (repository) => ({
+            ...repository,
+            starsToday: Number(repository.starsToday) || 0,
+            totalStars: Number(repository.totalStars) || 0,
+          }),
+        );
         setTrendingRepos(repositories);
         localStorage.setItem(
           TRENDING_CACHE_KEY,
@@ -358,15 +366,6 @@ function FindDevs() {
         <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary">
-                <span className="relative flex size-2">
-                  {!paused && (
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-                  )}
-                  <span className="relative size-1.5 rounded-full bg-primary" />
-                </span>{" "}
-                {paused ? "PAUSED · GITHUB ARCHIVE" : "STREAMING LIVE · GITHUB ARCHIVE"}
-              </div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">
                 The dev feed
               </h1>
@@ -474,9 +473,23 @@ function FindDevs() {
                       >
                         {repository.name}
                       </a>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {repository.starsToday.toLocaleString()} stars today
-                        {repository.language ? ` · ${repository.language}` : ""}
+                      <p className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="min-w-0 truncate">
+                          {repository.starsToday.toLocaleString()} stars today
+                          {repository.language ? ` · ${repository.language}` : ""}
+                        </span>
+                        {Number(repository.totalStars) > 0 && (
+                          <span
+                            className="ml-auto inline-flex shrink-0 items-center gap-1 text-foreground"
+                            title={`${Number(repository.totalStars).toLocaleString()} total stars`}
+                          >
+                            <Star
+                              className="size-3 fill-current text-amber-500"
+                              strokeWidth={1.5}
+                            />
+                            {Number(repository.totalStars).toLocaleString()}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </li>
@@ -538,7 +551,7 @@ function FindDevs() {
               Discover open-source projects that match your interests and skills.
             </p>
             <a
-              href="https://findopensource.dev/"
+              href="https://findopensource.dev/explore"
               target="_blank"
               rel="noreferrer"
               className="mt-4 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
@@ -548,6 +561,17 @@ function FindDevs() {
             </a>
           </section>
         </aside>
+      </div>
+
+      <div
+        role="status"
+        aria-live="polite"
+        className={`fixed top-[84px] left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background shadow-lg transition-[opacity,transform] duration-150 ease-out ${
+          paused ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"
+        }`}
+      >
+        <Pause className="size-3.5" strokeWidth={1.5} />
+        Feed paused
       </div>
 
       <button
