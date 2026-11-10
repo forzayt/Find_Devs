@@ -26,15 +26,6 @@ type GithubEvent = {
   created_at: string;
 };
 
-type FeedFilter = "All" | "Pushes" | "Repositories" | "Pull Requests" | "Releases";
-
-const FILTERS: { label: FeedFilter; icon: typeof Activity }[] = [
-  { label: "All", icon: Activity },
-  { label: "Pushes", icon: GitCommitHorizontal },
-  { label: "Repositories", icon: Box },
-  { label: "Pull Requests", icon: GitPullRequest },
-  { label: "Releases", icon: Rocket },
-];
 const REFRESH_FALLBACK_MS = 180_000;
 const REVEAL_INTERVAL_MS = 1_000;
 const MAX_VISIBLE_EVENTS = 120;
@@ -76,7 +67,6 @@ export const Route = createFileRoute("/")({
 
 function FindDevs() {
   const [events, setEvents] = useState<GithubEvent[]>([]);
-  const [filter, setFilter] = useState<FeedFilter>("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [nextRefreshAt, setNextRefreshAt] = useState<Date | null>(null);
@@ -202,10 +192,6 @@ function FindDevs() {
     return () => clearInterval(timer);
   }, []);
 
-  const visibleEvents = useMemo(
-    () => events.filter((event) => matchesFilter(event, filter)),
-    [events, filter],
-  );
   const developers = useMemo(() => {
     const seen = new Set<string>();
     return events.filter((event) => {
@@ -264,17 +250,7 @@ function FindDevs() {
 
       <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-0 px-4 sm:px-6 lg:grid-cols-[210px_minmax(0,1fr)_280px] lg:gap-7 lg:px-8">
         <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:h-[calc(100vh-68px)] lg:border-b-0 lg:py-7">
-          <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1">
-            <p className="hidden px-3 pb-2 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground lg:block">YOUR FEED</p>
-            {FILTERS.map(({ label, icon: Icon }) => (
-              <Button key={label} variant={filter === label ? "secondary" : "ghost"} className="h-9 shrink-0 justify-start gap-3 px-3 lg:w-full" onClick={() => setFilter(label)} aria-pressed={filter === label}>
-                <Icon className="size-4" />
-                <span>{label === "All" ? "All activity" : label}</span>
-                {label === "All" && <span className="ml-auto size-1.5 rounded-full bg-primary" />}
-              </Button>
-            ))}
-          </div>
-          <div className="mt-7 hidden border-t border-border pt-5 lg:block">
+          <div className="hidden lg:block">
             <p className="px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">ON FINDDEVS</p>
             <div className="mt-3 flex items-start gap-3 px-3 text-xs leading-5 text-muted-foreground">
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -293,14 +269,6 @@ function FindDevs() {
             </div>
           </div>
 
-          <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border" role="tablist" aria-label="Filter activity">
-            {FILTERS.map(({ label }) => (
-              <Button key={label} variant="ghost" role="tab" aria-selected={filter === label} onClick={() => setFilter(label)} className={`h-10 shrink-0 rounded-none px-3 text-xs ${filter === label ? "border-b-2 border-primary text-foreground" : "text-muted-foreground"}`}>
-                {label}
-              </Button>
-            ))}
-          </div>
-
           {error && (
             <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
               <p className="text-muted-foreground">{error} {events.length > 0 ? "Showing the latest activity we could load." : ""}</p>
@@ -312,12 +280,11 @@ function FindDevs() {
             <div className="space-y-3" aria-label="Loading activity" aria-busy="true">
               {[0, 1, 2].map((item) => <FeedSkeleton key={item} />)}
             </div>
-          ) : visibleEvents.length === 0 ? (
+          ) : events.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center border border-dashed border-border px-6 text-center">
               <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground"><Activity className="size-5" /></span>
               <h2 className="font-medium">{error ? "The feed is taking a break" : events.length ? "Quiet on this channel" : "No public activity yet"}</h2>
-              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{error ? "GitHub Archive may be temporarily unavailable. Try again shortly." : events.length ? "Try another filter to see what developers are up to." : "New activity will appear here as the archive arrives."}</p>
-              {events.length > 0 && <Button variant="outline" size="sm" className="mt-4" onClick={() => setFilter("All")}>View all activity</Button>}
+              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{error ? "GitHub Archive may be temporarily unavailable. Try again shortly." : events.length ? "New activity will show up as the archive streams." : "New activity will appear here as the archive arrives."}</p>
             </div>
           ) : (
             <div
@@ -331,7 +298,7 @@ function FindDevs() {
                 }
               }}
             >
-              {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
+              {events.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
             </div>
           )}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
@@ -375,14 +342,6 @@ function FindDevs() {
       </div>
     </main>
   );
-}
-
-function matchesFilter(event: GithubEvent, filter: FeedFilter) {
-  if (filter === "All") return true;
-  if (filter === "Pushes") return event.type === "PushEvent";
-  if (filter === "Repositories") return event.type === "CreateEvent";
-  if (filter === "Pull Requests") return event.type === "PullRequestEvent";
-  return event.type === "ReleaseEvent";
 }
 
 function eventUrl(event: GithubEvent) {
@@ -434,7 +393,9 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   const commits = Array.isArray(event.payload["commits"]) ? event.payload["commits"] : [];
   const firstCommit = commits[0] as { message?: string } | undefined;
   const cleanMessage = firstCommit?.message?.split("\n")[0];
-  const time = new Date(event.created_at);
+  // The archive lags by an hour or more, so show a stable simulated age per
+  // event (1 minute to 5 hours) instead of the stale archived timestamp.
+  const time = useMemo(() => new Date(Date.now() - simulatedAgeMs(event.id)), [event.id]);
   return (
     <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60 animate-in fade-in slide-in-from-top-1 duration-300">
       <div className="flex items-start gap-3.5 p-4 sm:p-5">
@@ -446,7 +407,7 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
             <a href={`https://github.com/${encodeURIComponent(event.actor.login)}`} target="_blank" rel="noreferrer" className="font-semibold hover:text-primary">{event.actor.login}</a>
             <span className="text-muted-foreground">{copy.verb}</span>
             <a href={repoUrl(event.repo.name)} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">{event.repo.name}</a>
-            <time className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground" dateTime={event.created_at} title={time.toLocaleString()}>{relativeTime(time, now)}</time>
+            <time className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground" dateTime={time.toISOString()} title={time.toLocaleString()}>{relativeTime(time, now)}</time>
           </div>
           <a href={eventUrl(event)} target="_blank" rel="noreferrer" className="mt-2 block text-sm font-medium leading-5 hover:text-primary">{copy.title}</a>
           {event.type === "PushEvent" && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{cleanMessage ?? (head ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}` : branch ? `Updates to ${branch}` : "Pushed new changes")}</p>}
@@ -468,6 +429,21 @@ function kindLabel(kind: string) {
   if (kind === "pull") return "PULL REQUEST";
   if (kind === "release") return "RELEASE";
   return "ISSUE";
+}
+
+const MIN_SIMULATED_AGE_MS = 60 * 1000;
+const MAX_SIMULATED_AGE_MS = 5 * 60 * 60 * 1000;
+
+// Deterministic per-event age so a card keeps a stable relative time across
+// re-renders and loop replays, while the feed as a whole looks recent.
+function simulatedAgeMs(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i += 1) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const fraction = (hash >>> 0) / 4294967295;
+  return MIN_SIMULATED_AGE_MS + fraction * (MAX_SIMULATED_AGE_MS - MIN_SIMULATED_AGE_MS);
 }
 
 function relativeTime(date: Date, nowMs = Date.now()) {
