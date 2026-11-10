@@ -83,7 +83,9 @@ function FindDevs() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [queued, setQueued] = useState(0);
+  const [paused, setPaused] = useState(false);
   const etagRef = useRef("");
+  const pausedRef = useRef(false);
   const queueRef = useRef<GithubEvent[]>([]);
   const poolRef = useRef<GithubEvent[]>([]);
   const seenRef = useRef(new Set<string>());
@@ -176,6 +178,7 @@ function FindDevs() {
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
+      if (pausedRef.current) return;
       let next = queueRef.current.shift();
       let restart = false;
 
@@ -230,6 +233,16 @@ function FindDevs() {
     setLoading(events.length === 0);
   };
 
+  const pauseStream = () => {
+    pausedRef.current = true;
+    setPaused(true);
+  };
+
+  const resumeStream = () => {
+    pausedRef.current = false;
+    setPaused(false);
+  };
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
@@ -274,7 +287,7 @@ function FindDevs() {
         <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" /><span className="relative size-1.5 rounded-full bg-primary" /></span> STREAMING LIVE · GITHUB ARCHIVE</div>
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="relative flex size-2">{!paused && <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />}<span className="relative size-1.5 rounded-full bg-primary" /></span> {paused ? "PAUSED · GITHUB ARCHIVE" : "STREAMING LIVE · GITHUB ARCHIVE"}</div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">The dev feed</h1>
               <p className="mt-1.5 text-sm text-muted-foreground"> Keep rolling your eyes, maybe you'll find a brain back there.</p>
             </div>
@@ -307,13 +320,23 @@ function FindDevs() {
               {events.length > 0 && <Button variant="outline" size="sm" className="mt-4" onClick={() => setFilter("All")}>View all activity</Button>}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div
+              className="space-y-3"
+              onMouseEnter={pauseStream}
+              onMouseLeave={resumeStream}
+              onFocus={pauseStream}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  resumeStream();
+                }
+              }}
+            >
               {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
             </div>
           )}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
             <span>Public events archived by <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-foreground hover:underline">GitHub Archive</a> · replayed at 1 event/second</span>
-            <span>{queued > 0 ? `${queued} events queued` : nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
+            <span>{paused ? "Paused while you hover" : queued > 0 ? `${queued} events queued` : nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
           </div>
         </section>
 
