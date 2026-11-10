@@ -45,6 +45,15 @@ const MIX_LABELS: Record<string, string> = {
   IssuesEvent: "Issues",
 };
 
+function shuffled<T>(items: readonly T[]) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -109,20 +118,15 @@ function FindDevs() {
         ? (body as GithubEvent[]).filter((event) => SUPPORTED_EVENTS.has(event.type))
         : [];
 
-      // Queue only unseen events, oldest first. The reveal timer below surfaces
-      // them one per second, so each new card lands at the top just like a live
-      // feed catching up in real time.
-      const incoming = [...nextEvents].sort(
-        (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
-      );
+      // Shuffle each fetched batch so reloading the feed does not replay the
+      // same activity in the same order.
+      const incoming = shuffled(nextEvents);
       if (incoming.length) poolRef.current = incoming;
 
-      const fresh = nextEvents.filter((event) => !seenRef.current.has(event.id));
+      const fresh = incoming.filter((event) => !seenRef.current.has(event.id));
       for (const event of fresh) seenRef.current.add(event.id);
       if (fresh.length) {
-        queueRef.current.push(
-          ...[...fresh].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
-        );
+        queueRef.current.push(...fresh);
       }
       if (!nextEvents.length) setLoading(false);
       return pollMs;
@@ -168,7 +172,7 @@ function FindDevs() {
       let restart = false;
 
       if (!next && poolRef.current.length) {
-        queueRef.current = [...poolRef.current];
+        queueRef.current = shuffled(poolRef.current);
         next = queueRef.current.shift();
         restart = true;
       }
@@ -176,8 +180,7 @@ function FindDevs() {
       if (next) {
         const nextEvent = next;
         setEvents((current) => {
-          const merged = restart ? [nextEvent] : [...current, nextEvent];
-          merged.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+          const merged = restart ? [nextEvent] : [nextEvent, ...current];
           return merged.slice(0, MAX_VISIBLE_EVENTS);
         });
         setLoading(false);
