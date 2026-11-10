@@ -85,6 +85,7 @@ function FindDevs() {
   const [queued, setQueued] = useState(0);
   const etagRef = useRef("");
   const queueRef = useRef<GithubEvent[]>([]);
+  const poolRef = useRef<GithubEvent[]>([]);
   const seenRef = useRef(new Set<string>());
 
   const refresh = useCallback(async (signal: AbortSignal) => {
@@ -121,13 +122,17 @@ function FindDevs() {
       // Queue only unseen events, oldest first. The reveal timer below surfaces
       // them one per second, so each new card lands at the top just like a live
       // feed catching up in real time.
+      const incoming = [...nextEvents].sort(
+        (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
+      );
+      if (incoming.length) poolRef.current = incoming;
+
       const fresh = nextEvents.filter((event) => !seenRef.current.has(event.id));
       for (const event of fresh) seenRef.current.add(event.id);
       if (fresh.length) {
-        const incoming = [...fresh].sort(
-          (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
+        queueRef.current.push(
+          ...[...fresh].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
         );
-        queueRef.current.push(...incoming);
         setQueued(queueRef.current.length);
       }
       if (!nextEvents.length) setLoading(false);
@@ -166,14 +171,24 @@ function FindDevs() {
 
   // GitHub Archive only publishes once an hour, so the feed is replayed at a
   // human pace: one queued event every second, plus a clock tick that keeps
-  // relative timestamps and the "updated" label moving.
+  // relative timestamps moving. When the batch runs out, it loops from the
+  // start so the feed never goes quiet.
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
-      const next = queueRef.current.shift();
+      let next = queueRef.current.shift();
+      let restart = false;
+
+      if (!next && poolRef.current.length) {
+        queueRef.current = [...poolRef.current];
+        next = queueRef.current.shift();
+        restart = true;
+      }
+
       if (next) {
+        const nextEvent = next;
         setEvents((current) => {
-          const merged = [...current, next];
+          const merged = restart ? [nextEvent] : [...current, nextEvent];
           merged.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
           return merged.slice(0, MAX_VISIBLE_EVENTS);
         });
