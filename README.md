@@ -1,42 +1,41 @@
 # Find Devs
 
-A live window into what developers are building across GitHub. Find Devs is a browser-only activity feed that reads GitHub's public REST API and presents real pushes, new repositories, pull requests, releases, and issues as they happen — no account, API key, or database required.
+A window into what developers are building across GitHub. Find Devs is a TanStack Start activity feed that reads [GitHub Archive](https://www.gharchive.org/)'s public hourly dumps and presents real pushes, new repositories, pull requests, releases, and issues — no GitHub account, API key, or database required.
 
 ## How it works
 
-Find Devs is a single-page TanStack Start application. The server renders the shell and route metadata (via `src/routes/__root.tsx` and `src/server.ts`), while all feed data is fetched directly from the browser to `https://api.github.com/events`.
+Find Devs is a single-page TanStack Start application. The server renders the shell and route metadata (via `src/routes/__root.tsx` and `src/server.ts`), and a small server route (`src/routes/api/events.ts`) reads GitHub Archive's dumps. The browser never calls the official GitHub API, so no shared hourly quota is ever consumed.
 
 ### Data flow
 
-1. On mount, the `/` route (`src/routes/index.tsx`) requests the latest public events:
+1. On mount, the `/` route (`src/routes/index.tsx`) requests the latest activity from the local feed endpoint:
    ```
-   GET https://api.github.com/events?per_page=100
+   GET /api/events?per_page=100
    ```
-2. The response is filtered to the event types the UI understands:
+2. `src/lib/gh-archive.ts` downloads the newest complete hourly dump from `https://data.gharchive.org/<YYYY-MM-DD-H>.json.gz`, decompresses it as a stream, and keeps only the newest events the UI understands:
    - `PushEvent`
    - `CreateEvent`
    - `PullRequestEvent`
    - `ReleaseEvent`
    - `IssuesEvent`
-3. Events are rendered as activity cards and can be narrowed with the feed filters.
-4. After each successful load, the app refreshes small sidebar summaries from the same payload:
+3. Parsed events are cached in memory for five minutes, so repeated polls reuse the already decompressed hour instead of downloading it again.
+4. Events are rendered as activity cards and can be narrowed with the feed filters.
+5. Sidebar summaries are derived from the same payload:
    - **Trending repositories** — repositories with the most events in the current feed.
    - **Around the community** — unique developers who appear in the feed.
-   - **Languages in the mix** — derived from optional repository metadata.
-5. Optional enrichment requests (repository language/stars and commit messages) are made at most **three times each per browser session**, so the events endpoint remains the only repeatedly-polled request.
+   - **What's happening** — event types present in the current feed.
 
-### Polling and rate limits
+### Freshness and polling
 
-The feed is designed to stay within GitHub's public API guidance:
+GitHub Archive publishes each hour's events shortly after the hour ends, so the feed trails GitHub by roughly one to two hours.
 
-- **Server-provided interval** — reads `X-Poll-Interval` and waits at least that long between requests.
-- **Fallback interval** — `90s` when GitHub does not provide a poll interval.
-- **Conditional requests** — sends the last `ETag` as `If-None-Match`; a `304 Not Modified` updates the "last checked" time without replacing the feed.
-- **Rate limiting** — on `403` with an exhausted `X-RateLimit-Remaining`, the UI shows a message and waits until `X-RateLimit-Reset`. On `429`, it honors `Retry-After`.
+- **Polling interval** — the feed endpoint advertises `X-Poll-Interval: 180`; the client waits at least three minutes between checks.
+- **Conditional requests** — the endpoint returns an `ETag`; a matching `If-None-Match` yields `304 Not Modified` without re-reading the archive.
+- **Server-side cache** — the parsed hour is reused for five minutes.
 - **Background tabs** — polling skips network requests while the page is hidden and resumes on the next scheduled check after the tab becomes visible.
 - **Manual refresh** — the header button restarts the polling cycle immediately.
 
-Because the public feed is unauthenticated, limits are shared per IP address. If GitHub is unavailable or rate-limited, the app keeps any already-loaded activity visible and offers a retry action.
+If GitHub Archive is unavailable, the app keeps any already-loaded activity visible and offers a retry action.
 
 ### UI states
 
@@ -48,10 +47,10 @@ Because the public feed is unauthenticated, limits are shared per IP address. If
 
 ## Features
 
-- Real public GitHub activity, streamed into a three-column feed.
+- Real public GitHub activity from GitHub Archive's hourly dumps.
 - Filters for **All**, **Pushes**, **Repositories**, **Pull Requests**, and **Releases**.
 - Rich activity cards with actor avatars, repository links, branch names, commit IDs, commit messages, PR/issue/release context, and direct links to GitHub.
-- Sidebar insights for trending repositories, active developers, and languages.
+- Sidebar insights for trending repositories, active developers, and event types.
 - Accessible tabs, alerts, and navigation labels.
 - Dark/light design tokens defined in Tailwind v4 (`src/styles.css`).
 
@@ -62,7 +61,7 @@ Because the public feed is unauthenticated, limits are shared per IP address. If
 | Framework | React 19 + TypeScript |
 | Meta-framework | TanStack Start |
 | Routing | TanStack Router |
-| Data fetching | Browser `fetch` (TanStack Query provider available) |
+| Data fetching | Browser `fetch` + a server route reading GitHub Archive |
 | Styling | Tailwind CSS v4 |
 | UI primitives | shadcn/ui + Radix UI |
 | Icons | lucide-react |
@@ -74,7 +73,7 @@ Because the public feed is unauthenticated, limits are shared per IP address. If
 ### Prerequisites
 
 - Node.js 20.19+ or 22.12+ (or Bun)
-- Network access to `api.github.com`
+- Network access to `data.gharchive.org`
 
 ### Install
 
@@ -117,10 +116,12 @@ npm run format
 src/
 ├── routes/
 │   ├── __root.tsx        # App shell, metadata, 404 and error boundaries
-│   └── index.tsx         # The feed: fetching, filters, cards, sidebars
+│   ├── index.tsx         # The feed: filters, cards, sidebars
+│   └── api/
+│       └── events.ts     # Server route serving archived events
 ├── components/ui/        # shadcn/ui primitives
 ├── hooks/                # Shared React hooks
-├── lib/                  # Utilities and error reporting
+├── lib/                  # Utilities, error reporting, GitHub Archive reader
 ├── router.tsx            # Router + QueryClient factory
 ├── routeTree.gen.ts      # Generated route tree (do not edit)
 ├── server.ts             # SSR entry with catastrophic-error handling
@@ -131,8 +132,8 @@ src/
 
 ## Notes
 
-- No API keys or secrets are used; all requests target GitHub's public, unauthenticated API.
-- Repository and commit enrichment is best-effort. Cards render fully without it.
+- No API keys or secrets are used; the app does not call `api.github.com`.
+- GitHub Archive dumps are public and cover every public event, but they lag by about an hour.
 - `src/routeTree.gen.ts` is generated by TanStack Router and should not be edited by hand.
 - Schema, database, and deployment configuration are managed through Lovable; see `AGENTS.md` before changing generated files or migrations.
 

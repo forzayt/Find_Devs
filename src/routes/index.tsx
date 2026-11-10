@@ -12,7 +12,6 @@ import {
   Radio,
   RefreshCw,
   Rocket,
-  Star,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -28,7 +27,6 @@ type GithubEvent = {
   created_at: string;
 };
 
-type RepoDetails = { language?: string | null; stargazers_count?: number };
 type FeedFilter = "All" | "Pushes" | "Repositories" | "Pull Requests" | "Releases";
 
 const FILTERS: { label: FeedFilter; icon: typeof Activity }[] = [
@@ -38,7 +36,8 @@ const FILTERS: { label: FeedFilter; icon: typeof Activity }[] = [
   { label: "Pull Requests", icon: GitPullRequest },
   { label: "Releases", icon: Rocket },
 ];
-const REFRESH_FALLBACK_MS = 90_000;
+const REFRESH_FALLBACK_MS = 180_000;
+const FEED_ENDPOINT = "/api/events?per_page=100";
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
   "CreateEvent",
@@ -46,6 +45,13 @@ const SUPPORTED_EVENTS = new Set([
   "ReleaseEvent",
   "IssuesEvent",
 ]);
+const MIX_LABELS: Record<string, string> = {
+  PushEvent: "Pushes",
+  CreateEvent: "New repositories",
+  PullRequestEvent: "Pull requests",
+  ReleaseEvent: "Releases",
+  IssuesEvent: "Issues",
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,12 +59,12 @@ export const Route = createFileRoute("/")({
       { title: "FindDevs — See what developers are building" },
       {
         name: "description",
-        content: "A live window into what developers are building across GitHub.",
+        content: "A window into what developers are building across GitHub.",
       },
       { property: "og:title", content: "FindDevs — See what developers are building" },
       {
         property: "og:description",
-        content: "A live window into what developers are building across GitHub.",
+        content: "A window into what developers are building across GitHub.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -69,8 +75,6 @@ export const Route = createFileRoute("/")({
 
 function FindDevs() {
   const [events, setEvents] = useState<GithubEvent[]>([]);
-  const [repoDetails, setRepoDetails] = useState<Record<string, RepoDetails>>({});
-  const [commitMessages, setCommitMessages] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<FeedFilter>("All");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,8 +83,6 @@ function FindDevs() {
   const [nextRefreshAt, setNextRefreshAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const etagRef = useRef("");
-  const detailsRef = useRef(new Set<string>());
-  const commitsRef = useRef(new Set<string>());
 
   const refresh = useCallback(async (signal: AbortSignal) => {
     setRefreshing(true);
@@ -89,7 +91,7 @@ function FindDevs() {
     try {
       const headers = new Headers();
       if (etagRef.current) headers.set("If-None-Match", etagRef.current);
-      const response = await fetch("https://api.github.com/events?per_page=100", {
+      const response = await fetch(FEED_ENDPOINT, {
         headers,
         cache: "no-store",
         signal,
@@ -105,18 +107,7 @@ function FindDevs() {
       }
 
       if (!response.ok) {
-        const remaining = response.headers.get("X-RateLimit-Remaining");
-        const reset = Number(response.headers.get("X-RateLimit-Reset"));
-        if (response.status === 403 && remaining === "0" && reset > 0) {
-          pollMs = Math.max(pollMs, reset * 1000 - Date.now() + 1000);
-          throw new Error("GitHub's public feed has reached its shared hourly limit.");
-        }
-        if (response.status === 429) {
-          const retryAfter = Number(response.headers.get("Retry-After"));
-          if (Number.isFinite(retryAfter) && retryAfter > 0) pollMs = Math.max(pollMs, retryAfter * 1000);
-          throw new Error("GitHub is asking us to pause before checking again.");
-        }
-        throw new Error(`GitHub couldn't load the activity feed (${response.status}).`);
+        throw new Error(`GitHub Archive couldn't load the activity feed (${response.status}).`);
       }
 
       const nextEtag = response.headers.get("ETag");
@@ -128,48 +119,6 @@ function FindDevs() {
       setEvents(nextEvents);
       setLastUpdated(new Date());
       setLoading(false);
-
-      // Enrich a small number of real feed items once per session, so the public
-      // activity endpoint remains the only repeatedly-polled request.
-      for (const event of nextEvents) {
-        if (signal.aborted) break;
-        if (detailsRef.current.size < 3 && !detailsRef.current.has(event.repo.name)) {
-          detailsRef.current.add(event.repo.name);
-          try {
-            const repoResponse = await fetch(
-              `https://api.github.com/repos/${event.repo.name.split("/").map(encodeURIComponent).join("/")}`,
-              { cache: "no-store", signal },
-            );
-            if (repoResponse.ok) {
-              const details = (await repoResponse.json()) as RepoDetails;
-              setRepoDetails((current) => ({ ...current, [event.repo.name]: details }));
-            }
-          } catch {
-            // The activity card remains complete without optional repo metadata.
-          }
-        }
-
-        const head = typeof event.payload.head === "string" ? event.payload.head : "";
-        const commitKey = `${event.repo.name}@${head}`;
-        if (event.type === "PushEvent" && head && commitsRef.current.size < 3 && !commitsRef.current.has(commitKey)) {
-          commitsRef.current.add(commitKey);
-          try {
-            const commitResponse = await fetch(
-              `https://api.github.com/repos/${event.repo.name.split("/").map(encodeURIComponent).join("/")}/commits/${encodeURIComponent(head)}`,
-              { cache: "no-store", signal },
-            );
-            if (commitResponse.ok) {
-              const commit = (await commitResponse.json()) as { commit?: { message?: string } };
-              if (commit.commit?.message) {
-                setCommitMessages((current) => ({ ...current, [commitKey]: commit.commit?.message ?? "" }));
-              }
-            }
-          } catch {
-            // Fall back to the branch and abbreviated commit ID from the event.
-          }
-        }
-        if (detailsRef.current.size >= 3 && commitsRef.current.size >= 3) break;
-      }
       return pollMs;
     } catch (caught) {
       if (!signal.aborted) {
@@ -222,13 +171,14 @@ function FindDevs() {
     for (const event of events) counts.set(event.repo.name, (counts.get(event.repo.name) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   }, [events]);
-  const languages = useMemo(() => {
+  const activityMix = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const [repo, details] of Object.entries(repoDetails)) {
-      if (details.language) counts.set(details.language, (counts.get(details.language) ?? 0) + (events.filter((event) => event.repo.name === repo).length || 1));
+    for (const event of events) {
+      const label = MIX_LABELS[event.type] ?? "Other";
+      counts.set(label, (counts.get(label) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [events, repoDetails]);
+  }, [events]);
 
   const handleRefresh = () => {
     setRefreshKey((key) => key + 1);
@@ -244,7 +194,7 @@ function FindDevs() {
               <Code2 className="size-5" />
             </span>
             <span className="text-lg font-bold tracking-normal">Find<span className="text-primary">Devs</span></span>
-            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, live</span>
+            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, archived hourly</span>
           </a>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
@@ -280,20 +230,20 @@ function FindDevs() {
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
               <p>Open feed. Real work. Straight from GitHub.</p>
             </div>
-            <p className="mt-5 px-3 text-[11px] leading-5 text-muted-foreground">Activity can arrive with a delay from GitHub’s public feed.</p>
+            <p className="mt-5 px-3 text-[11px] leading-5 text-muted-foreground">GitHub Archive publishes activity with roughly an hour of delay.</p>
           </div>
         </aside>
 
         <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" /> LIVE FROM GITHUB</div>
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-primary"><span className="size-1.5 rounded-full bg-primary" /> FROM THE GITHUB ARCHIVE</div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">The dev feed</h1>
               <p className="mt-1.5 text-sm text-muted-foreground"> Keep rolling your eyes, maybe you'll find a brain back there.</p>
             </div>
             <div className="text-right text-xs text-muted-foreground">
               <p>{events.length ? `${events.length} recent activities` : "Public activity"}</p>
-              <p className="mt-1">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connecting to GitHub…"}</p>
+              <p className="mt-1">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connecting to GitHub Archive…"}</p>
             </div>
           </div>
 
@@ -320,16 +270,16 @@ function FindDevs() {
             <div className="flex min-h-64 flex-col items-center justify-center border border-dashed border-border px-6 text-center">
               <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground"><Activity className="size-5" /></span>
               <h2 className="font-medium">{error ? "The feed is taking a break" : events.length ? "Quiet on this channel" : "No public activity yet"}</h2>
-              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{error ? "GitHub’s public feed may be temporarily unavailable. Try again shortly." : events.length ? "Try another filter to see what developers are up to." : "New activity will appear here as it arrives from GitHub."}</p>
+              <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{error ? "GitHub Archive may be temporarily unavailable. Try again shortly." : events.length ? "Try another filter to see what developers are up to." : "New activity will appear here as the archive arrives."}</p>
               {events.length > 0 && <Button variant="outline" size="sm" className="mt-4" onClick={() => setFilter("All")}>View all activity</Button>}
             </div>
           ) : (
             <div className="space-y-3">
-              {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} commitMessage={commitMessages[`${event.repo.name}@${String(event.payload.head ?? "")}`]} repoDetails={repoDetails[event.repo.name]} />)}
+              {visibleEvents.map((event) => <ActivityCard key={event.id} event={event} />)}
             </div>
           )}
           <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
-            <span>Public events provided by GitHub</span>
+            <span>Public events archived by <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-foreground hover:underline">GitHub Archive</a></span>
             <span>{nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
           </div>
         </section>
@@ -341,8 +291,7 @@ function FindDevs() {
             </div>
             {trendingRepos.length ? <ol className="space-y-1">{trendingRepos.map(([name, count], index) => <li key={name} className="flex items-start gap-3 py-2">
               <span className="pt-0.5 font-mono text-xs text-muted-foreground">0{index + 1}</span>
-              <div className="min-w-0 flex-1"><a href={repoUrl(name)} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium hover:text-primary">{name}</a><p className="mt-1 text-[11px] text-muted-foreground">{repoDetails[name]?.language ?? "Repository"}{repoDetails[name]?.language ? " · " : ""}{count} recent {count === 1 ? "event" : "events"}</p></div>
-              <span className="flex items-center gap-1 pt-0.5 text-[11px] text-muted-foreground"><Star className="size-3" />{repoDetails[name]?.stargazers_count?.toLocaleString() ?? "—"}</span>
+              <div className="min-w-0 flex-1"><a href={repoUrl(name)} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium hover:text-primary">{name}</a><p className="mt-1 text-[11px] text-muted-foreground">{count} recent {count === 1 ? "event" : "events"}</p></div>
             </li>)}</ol> : <SidebarEmpty>Repos appear as they’re mentioned in the feed.</SidebarEmpty>}
           </section>
 
@@ -354,17 +303,17 @@ function FindDevs() {
             </li>)}</ul> : <SidebarEmpty>Developers will show up with new activity.</SidebarEmpty>}
           </section>
 
-          <section className="border-t border-border pt-6" aria-labelledby="languages-title">
-            <div className="mb-4 flex items-center justify-between"><h2 id="languages-title" className="text-sm font-semibold">Languages in the mix</h2><Code2 className="size-4 text-muted-foreground" /></div>
-            {languages.length ? <ul className="space-y-3">{languages.map(([language, count], index) => <li key={language}>
-              <div className="mb-1.5 flex items-center justify-between text-xs"><span>{language}</span><span className="text-muted-foreground">{count} {count === 1 ? "repo" : "repos"}</span></div>
+          <section className="border-t border-border pt-6" aria-labelledby="mix-title">
+            <div className="mb-4 flex items-center justify-between"><h2 id="mix-title" className="text-sm font-semibold">What’s happening</h2><Code2 className="size-4 text-muted-foreground" /></div>
+            {activityMix.length ? <ul className="space-y-3">{activityMix.map(([label, count], index) => <li key={label}>
+              <div className="mb-1.5 flex items-center justify-between text-xs"><span>{label}</span><span className="text-muted-foreground">{count} {count === 1 ? "event" : "events"}</span></div>
               <div className="h-1 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full language-meter language-meter-${index}`} /></div>
-            </li>)}</ul> : <SidebarEmpty>Languages appear when repository details are available.</SidebarEmpty>}
+            </li>)}</ul> : <SidebarEmpty>Event types appear as activity arrives.</SidebarEmpty>}
           </section>
 
           <div className="border-t border-border pt-5 text-[11px] leading-5 text-muted-foreground">
-            <a href="https://docs.github.com/en/rest/activity/events" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">About GitHub events <ArrowUpRight className="size-3" /></a>
-            <p className="mt-2">Updates follow GitHub’s polling interval and availability.</p>
+            <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">About GitHub Archive <ArrowUpRight className="size-3" /></a>
+            <p className="mt-2">Data is published hourly by GitHub Archive.</p>
           </div>
         </aside>
       </div>
@@ -421,12 +370,14 @@ function eventCopy(event: GithubEvent) {
   return { verb: `${action} an issue in`, title: issue?.title ?? "Issue", icon: CircleDot, kind: "issue" };
 }
 
-function ActivityCard({ event, commitMessage, repoDetails }: { event: GithubEvent; commitMessage?: string; repoDetails?: RepoDetails }) {
+function ActivityCard({ event }: { event: GithubEvent }) {
   const copy = eventCopy(event);
   const Icon = copy.icon;
   const branch = typeof event.payload.ref === "string" ? event.payload.ref.replace("refs/heads/", "") : "";
   const head = typeof event.payload.head === "string" ? event.payload.head : "";
-  const cleanMessage = commitMessage?.split("\n")[0];
+  const commits = Array.isArray(event.payload["commits"]) ? event.payload["commits"] : [];
+  const firstCommit = commits[0] as { message?: string } | undefined;
+  const cleanMessage = firstCommit?.message?.split("\n")[0];
   const time = new Date(event.created_at);
   return (
     <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60">
@@ -446,7 +397,6 @@ function ActivityCard({ event, commitMessage, repoDetails }: { event: GithubEven
           {event.type === "PullRequestEvent" && typeof event.payload.action === "string" && <p className="mt-2 text-xs text-muted-foreground">{event.payload.action === "opened" ? "A new contribution is ready for review." : "Pull request activity"}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium activity-kind activity-kind-${copy.kind}`}><Icon className="size-3" />{kindLabel(copy.kind)}</span>
-            {repoDetails?.language && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><span className="size-1.5 rounded-full bg-primary" />{repoDetails.language}</span>}
             {event.type === "PushEvent" && head && <span className="font-mono text-[10px] text-muted-foreground">{head.slice(0, 7)}</span>}
             <a href={eventUrl(event)} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-primary">View on GitHub <ArrowUpRight className="size-3" /></a>
           </div>

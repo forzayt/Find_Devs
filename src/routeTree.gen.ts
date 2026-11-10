@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiGithubSplatRouteImport } from './routes/api/github/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGithubSplatRoute = ApiGithubSplatRouteImport.update({
+  id: '/api/github/$',
+  path: '/api/github/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/github/$': typeof ApiGithubSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/github/$': typeof ApiGithubSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/github/$': typeof ApiGithubSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/events' | '/api/github/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/events' | '/api/github/$'
+  id: '__root__' | '/' | '/api/events' | '/api/github/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiEventsRoute: typeof ApiEventsRoute
+  ApiGithubSplatRoute: typeof ApiGithubSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/github/$': {
+      id: '/api/github/$'
+      path: '/api/github/$'
+      fullPath: '/api/github/$'
+      preLoaderRoute: typeof ApiGithubSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiEventsRoute: ApiEventsRoute,
+  ApiGithubSplatRoute: ApiGithubSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
