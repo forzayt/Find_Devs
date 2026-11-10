@@ -235,7 +235,7 @@ function FindDevs() {
               <Code2 className="size-5" />
             </span>
             <span className="text-lg font-bold tracking-normal">Find<span className="text-primary">Devs</span></span>
-            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">developer activity, streaming live</span>
+            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">Tracking the heartbeat of GitHub & see what's devs are cooking.</span>
           </a>
           <div className="flex items-center gap-3">
             <a href="https://github.com/forzayt/Find_Devs" target="_blank" rel="noreferrer" aria-label="Fork FindDevs on GitHub" className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
