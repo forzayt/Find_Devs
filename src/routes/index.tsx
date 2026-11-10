@@ -41,6 +41,7 @@ const TRENDING_CACHE_KEY = "finddevs:github-trending:v4";
 const TRENDING_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEVELOPERS_ENDPOINT = "/api/trending-developers";
 const DEVELOPERS_CACHE_KEY = "finddevs:github-trending-developers:v1";
+const STAR_POLL_INTERVAL_MS = 60_000;
 const SUPPORTED_EVENTS = new Set([
   "PushEvent",
   "CreateEvent",
@@ -157,6 +158,59 @@ function FindDevs() {
     window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
   }, []);
+
+  const trendingRepoNames = useMemo(
+    () =>
+      trendingRepos
+        .slice(0, 4)
+        .map((repository) => repository.name)
+        .join(","),
+    [trendingRepos],
+  );
+
+  useEffect(() => {
+    if (!trendingRepoNames) return;
+
+    const controller = new AbortController();
+    const refreshStarCounts = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const response = await fetch(
+          `/api/repository-stars?repos=${encodeURIComponent(trendingRepoNames)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) return;
+        const counts = (await response.json()) as Record<
+          string,
+          { totalStars?: number; starsToday?: number }
+        >;
+        setTrendingRepos((current) =>
+          current.map((repository) => {
+            const nextCounts = counts[repository.name];
+            if (!nextCounts) return repository;
+            const totalStars = Number.isFinite(nextCounts.totalStars)
+              ? Number(nextCounts.totalStars)
+              : repository.totalStars;
+            const starsToday = Number.isFinite(nextCounts.starsToday)
+              ? Number(nextCounts.starsToday)
+              : repository.starsToday;
+            return totalStars !== repository.totalStars || starsToday !== repository.starsToday
+              ? { ...repository, totalStars, starsToday }
+              : repository;
+          }),
+        );
+      } catch (error) {
+        if (!controller.signal.aborted) console.error("Unable to refresh star counts", error);
+      }
+    };
+
+    void refreshStarCounts();
+    const timer = setInterval(refreshStarCounts, STAR_POLL_INTERVAL_MS);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [trendingRepoNames]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -475,7 +529,7 @@ function FindDevs() {
                       </a>
                       <p className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                         <span className="min-w-0 truncate">
-                          {repository.starsToday.toLocaleString()} stars today
+                          <AnimatedNumber value={repository.starsToday} /> stars today
                           {repository.language ? ` · ${repository.language}` : ""}
                         </span>
                         {Number(repository.totalStars) > 0 && (
@@ -487,7 +541,7 @@ function FindDevs() {
                               className="size-3 fill-current text-amber-500"
                               strokeWidth={1.5}
                             />
-                            {Number(repository.totalStars).toLocaleString()}
+                            <AnimatedNumber value={Number(repository.totalStars)} />
                           </span>
                         )}
                       </p>
@@ -833,6 +887,39 @@ function DeveloperSkeleton() {
       </div>
     </div>
   );
+}
+
+function AnimatedNumber({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const displayedValueRef = useRef(value);
+
+  useEffect(() => {
+    const startValue = displayedValueRef.current;
+    if (startValue === value) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      displayedValueRef.current = value;
+      setDisplayValue(value);
+      return;
+    }
+
+    const duration = 600;
+    const startedAt = performance.now();
+    let frame = 0;
+    const animate = (now: number) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextValue = Math.round(startValue + (value - startValue) * eased);
+      displayedValueRef.current = nextValue;
+      setDisplayValue(nextValue);
+      if (progress < 1) frame = requestAnimationFrame(animate);
+    };
+
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <span className="tabular-nums">{displayValue.toLocaleString()}</span>;
 }
 
 function SidebarEmpty({ children }: { children: React.ReactNode }) {
