@@ -10,6 +10,8 @@ import {
   GitCommitHorizontal,
   GitFork,
   GitPullRequest,
+  Maximize2,
+  Minimize2,
   Pause,
   Radio,
   Rocket,
@@ -93,6 +95,7 @@ function FindDevs() {
   const [developers, setDevelopers] = useState<TrendingDeveloper[]>([]);
   const [developersLoading, setDevelopersLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
   const interactionPausedRef = useRef(false);
@@ -160,6 +163,13 @@ function FindDevs() {
     updateScrollTopVisibility();
     window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
+  }, []);
+
+  useEffect(() => {
+    const updateFullscreenState = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    updateFullscreenState();
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", updateFullscreenState);
   }, []);
 
   useEffect(() => {
@@ -425,6 +435,37 @@ function FindDevs() {
             </span>
           </a>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              onClick={async () => {
+                try {
+                  if (document.fullscreenElement) await document.exitFullscreen();
+                  else await document.documentElement.requestFullscreen();
+                } catch (error) {
+                  console.error("Fullscreen mode is unavailable", error);
+                }
+              }}
+              className="relative flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-[color,background-color,transform] hover:bg-accent hover:text-foreground active:scale-[0.96]"
+            >
+              <Maximize2
+                className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
+                  isFullscreen
+                    ? "scale-[0.25] opacity-0 blur-[4px]"
+                    : "scale-100 opacity-100 blur-0"
+                }`}
+                strokeWidth={1.5}
+              />
+              <Minimize2
+                className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
+                  isFullscreen
+                    ? "scale-100 opacity-100 blur-0"
+                    : "scale-[0.25] opacity-0 blur-[4px]"
+                }`}
+                strokeWidth={1.5}
+              />
+            </button>
             <a
               href="https://github.com/forzayt/Find_Devs"
               target="_blank"
