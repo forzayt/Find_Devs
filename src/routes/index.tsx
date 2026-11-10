@@ -69,10 +69,8 @@ function FindDevs() {
   const [events, setEvents] = useState<GithubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [nextRefreshAt, setNextRefreshAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const [queued, setQueued] = useState(0);
   const [paused, setPaused] = useState(false);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
@@ -125,7 +123,6 @@ function FindDevs() {
         queueRef.current.push(
           ...[...fresh].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
         );
-        setQueued(queueRef.current.length);
       }
       if (!nextEvents.length) setLoading(false);
       return pollMs;
@@ -149,8 +146,6 @@ function FindDevs() {
       }
       const delay = await refresh(controller.signal);
       if (disposed || controller.signal.aborted) return;
-      const next = new Date(Date.now() + delay);
-      setNextRefreshAt(next);
       timer = setTimeout(schedule, delay);
     };
     void schedule();
@@ -187,7 +182,6 @@ function FindDevs() {
         });
         setLoading(false);
       }
-      setQueued(queueRef.current.length);
     }, REVEAL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
@@ -256,7 +250,6 @@ function FindDevs() {
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
               <p>Open feed. Real work. Straight from GitHub.</p>
             </div>
-            <p className="mt-5 px-3 text-[11px] leading-5 text-muted-foreground">GitHub Archive publishes activity with roughly an hour of delay.</p>
           </div>
         </aside>
 
@@ -301,10 +294,6 @@ function FindDevs() {
               {events.map((event) => <ActivityCard key={event.id} event={event} now={now} />)}
             </div>
           )}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
-            <span>Public events archived by <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-foreground hover:underline">GitHub Archive</a> · replayed at 1 event/second</span>
-            <span>{paused ? "Paused while you hover" : queued > 0 ? `${queued} events queued` : nextRefreshAt ? `Next check after ${nextRefreshAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Waiting for first update"}</span>
-          </div>
         </section>
 
         <aside className="hidden min-w-0 space-y-7 py-8 lg:block">
@@ -334,10 +323,6 @@ function FindDevs() {
             </li>)}</ul> : <SidebarEmpty>Event types appear as activity arrives.</SidebarEmpty>}
           </section>
 
-          <div className="border-t border-border pt-5 text-[11px] leading-5 text-muted-foreground">
-            <a href="https://www.gharchive.org/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">About GitHub Archive <ArrowUpRight className="size-3" /></a>
-            <p className="mt-2">Data is published hourly by GitHub Archive.</p>
-          </div>
         </aside>
       </div>
     </main>
