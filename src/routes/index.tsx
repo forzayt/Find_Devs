@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
   ArrowDownLeft,
+  ArrowUp,
   ArrowUpRight,
   Box,
   CircleDot,
@@ -86,6 +87,7 @@ function FindDevs() {
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [developers, setDevelopers] = useState<TrendingDeveloper[]>([]);
   const [developersLoading, setDevelopersLoading] = useState(true);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
   const queueRef = useRef<GithubEvent[]>([]);
@@ -145,6 +147,13 @@ function FindDevs() {
       }
       return pollMs;
     }
+  }, []);
+
+  useEffect(() => {
+    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 480);
+    updateScrollTopVisibility();
+    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
   }, []);
 
   useEffect(() => {
@@ -520,8 +529,44 @@ function FindDevs() {
               <SidebarEmpty>GitHub Trending Developers is unavailable right now.</SidebarEmpty>
             )}
           </section>
+
+          <section className="border-t border-border pt-6" aria-labelledby="contribute-title">
+            <h2 id="contribute-title" className="text-sm font-semibold">
+              Looking to contribute to something?
+            </h2>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              Discover open-source projects that match your interests and skills.
+            </p>
+            <a
+              href="https://findopensource.dev/"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
+            >
+              Find a project
+              <ArrowUpRight className="size-3.5" strokeWidth={2} />
+            </a>
+          </section>
         </aside>
       </div>
+
+      <button
+        type="button"
+        aria-label="Scroll to top"
+        title="Scroll to top"
+        tabIndex={showScrollTop ? 0 : -1}
+        onClick={() => {
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+        }}
+        className={`fixed right-5 bottom-5 z-30 flex size-10 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-[opacity,transform] duration-150 ease-out active:scale-[0.96] sm:right-7 sm:bottom-7 ${
+          showScrollTop
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-2 opacity-0"
+        }`}
+      >
+        <ArrowUp className="size-4" strokeWidth={2} />
+      </button>
     </main>
   );
 }
