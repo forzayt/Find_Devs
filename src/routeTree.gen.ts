@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiProjectMetaRouteImport } from './routes/api/project-meta'
 import { Route as ApiRepositoryStarsRouteImport } from './routes/api/repository-stars'
 import { Route as ApiTrendingRouteImport } from './routes/api/trending'
 import { Route as ApiTrendingDevelopersRouteImport } from './routes/api/trending-developers'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectMetaRoute = ApiProjectMetaRouteImport.update({
+  id: '/api/project-meta',
+  path: '/api/project-meta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRepositoryStarsRoute = ApiRepositoryStarsRouteImport.update({
@@ -44,6 +50,7 @@ const ApiTrendingDevelopersRoute = ApiTrendingDevelopersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
   '/api/trending': typeof ApiTrendingRoute
   '/api/trending-developers': typeof ApiTrendingDevelopersRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
   '/api/trending': typeof ApiTrendingRoute
   '/api/trending-developers': typeof ApiTrendingDevelopersRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
   '/api/trending': typeof ApiTrendingRoute
   '/api/trending-developers': typeof ApiTrendingDevelopersRoute
@@ -68,6 +77,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/events'
+    | '/api/project-meta'
     | '/api/repository-stars'
     | '/api/trending'
     | '/api/trending-developers'
@@ -75,6 +85,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/api/events'
+    | '/api/project-meta'
     | '/api/repository-stars'
     | '/api/trending'
     | '/api/trending-developers'
@@ -82,6 +93,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/api/events'
+    | '/api/project-meta'
     | '/api/repository-stars'
     | '/api/trending'
     | '/api/trending-developers'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiProjectMetaRoute: typeof ApiProjectMetaRoute
   ApiRepositoryStarsRoute: typeof ApiRepositoryStarsRoute
   ApiTrendingRoute: typeof ApiTrendingRoute
   ApiTrendingDevelopersRoute: typeof ApiTrendingDevelopersRoute
@@ -109,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/project-meta': {
+      id: '/api/project-meta'
+      path: '/api/project-meta'
+      fullPath: '/api/project-meta'
+      preLoaderRoute: typeof ApiProjectMetaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/repository-stars': {
@@ -138,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiProjectMetaRoute: ApiProjectMetaRoute,
   ApiRepositoryStarsRoute: ApiRepositoryStarsRoute,
   ApiTrendingRoute: ApiTrendingRoute,
   ApiTrendingDevelopersRoute: ApiTrendingDevelopersRoute,

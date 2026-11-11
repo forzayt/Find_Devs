@@ -14,7 +14,6 @@ import {
   Minimize2,
   Pause,
   Rocket,
-  Sparkles,
   Star,
   Users,
 } from "lucide-react";
@@ -25,9 +24,10 @@ import type { TrendingDeveloper } from "@/lib/github-trending-developers";
 import type { TrendingRepository } from "@/lib/github-trending";
 import {
   projectSubmissionUrl,
+  showcaseProjectStack,
   showcaseProjectUrl,
-  showcaseProjects,
 } from "@/lib/project-showcase";
+import { useShowcaseProjects } from "@/hooks/use-showcase-projects";
 
 type GithubEvent = {
   id: string;
@@ -101,6 +101,7 @@ function FindDevs() {
   const [developersLoading, setDevelopersLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showShowcase, setShowShowcase] = useState(false);
   const etagRef = useRef("");
   const pausedRef = useRef(false);
   const interactionPausedRef = useRef(false);
@@ -488,38 +489,27 @@ function FindDevs() {
         <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-68px)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:border-b-0 lg:py-7">
           <div className="hidden lg:block">
             <section className="px-3" aria-labelledby="showcase-title">
-              <div className="flex items-center justify-between">
-                <h2 id="showcase-title" className="text-sm font-semibold">
-                  Project showcase
-                </h2>
-                <Sparkles className="size-4 text-muted-foreground" />
-              </div>
-              <ul className="mt-3 space-y-3">
-                {showcaseProjects.map((project) => (
-                  <li key={project.repo}>
-                    <a
-                      href={showcaseProjectUrl(project)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block truncate text-xs font-medium hover:text-primary"
-                    >
-                      {project.name}
-                    </a>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                      {project.description}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <a
-                href={projectSubmissionUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+              <h2 id="showcase-title" className="text-sm font-semibold">
+                Project showcase
+              </h2>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Open-source projects worth a look, picked by the community.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowShowcase((value) => !value);
+                  window.scrollTo({ top: 0 });
+                }}
+                aria-pressed={showShowcase}
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
               >
-                Submit your project
-                <ArrowUpRight className="size-3" />
-              </a>
+                {showShowcase ? "Back to feed" : "Open showcase"}
+                <ArrowUpRight
+                  className={`size-3.5 transition-transform ${showShowcase ? "rotate-180" : ""}`}
+                  strokeWidth={2}
+                />
+              </button>
             </section>
 
             <section
@@ -545,7 +535,10 @@ function FindDevs() {
           </div>
         </aside>
 
-        <section className="min-w-0 py-6 lg:py-8" aria-label="GitHub activity feed">
+        <section
+          className={`min-w-0 py-6 lg:py-8 ${showShowcase ? "hidden" : ""}`}
+          aria-label="GitHub activity feed"
+        >
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">
@@ -620,6 +613,8 @@ function FindDevs() {
             </div>
           )}
         </section>
+
+        {showShowcase && <ProjectShowcase />}
 
         <aside className="hidden min-w-0 space-y-7 py-8 lg:sticky lg:top-[68px] lg:block lg:max-h-[calc(100vh-68px)] lg:self-start lg:overflow-y-auto lg:overscroll-contain">
           <section aria-labelledby="trending-title">
@@ -853,6 +848,69 @@ function eventCopy(event: GithubEvent) {
     icon: CircleDot,
     kind: "issue",
   };
+}
+
+function ProjectShowcase() {
+  const projects = useShowcaseProjects();
+  return (
+    <section className="min-w-0 py-6 lg:py-8" aria-label="Project showcase">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-normal sm:text-[28px]">
+            Project showcase
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Open-source projects worth a look, picked by the community.
+          </p>
+        </div>
+        <a
+          href={projectSubmissionUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
+        >
+          Submit your project
+          <ArrowUpRight className="size-3.5" strokeWidth={2} />
+        </a>
+      </div>
+      <ul className="space-y-3">
+        {projects.map((project) => {
+          const stack = showcaseProjectStack(project);
+          return (
+            <li key={project.url}>
+              <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60">
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <a
+                      href={showcaseProjectUrl(project)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium hover:text-primary"
+                    >
+                      {project.name}
+                    </a>
+                    {project.status && (
+                      <span className="rounded-sm bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {project.status}
+                      </span>
+                    )}
+                  </div>
+                  {project.description && (
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {project.description}
+                    </p>
+                  )}
+                  {stack.length > 0 && (
+                    <p className="mt-3 text-[11px] text-muted-foreground">{stack.join(" · ")}</p>
+                  )}
+                </div>
+              </article>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
