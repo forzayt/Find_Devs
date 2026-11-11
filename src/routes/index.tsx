@@ -848,7 +848,7 @@ function eventCopy(event: GithubEvent) {
 }
 
 function ProjectShowcase() {
-  const projects = useShowcaseProjects();
+  const { projects, loading } = useShowcaseProjects();
   return (
     <section className="min-w-0 py-6 lg:py-8" aria-label="Project showcase">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -870,41 +870,45 @@ function ProjectShowcase() {
           <ArrowUpRight className="size-3.5" strokeWidth={2} />
         </a>
       </div>
-      <ul className="space-y-3">
-        {projects.map((project) => {
-          const stack = showcaseProjectStack(project);
-          return (
-            <li key={project.url}>
-              <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60">
-                <div className="p-4 sm:p-5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <a
-                      href={showcaseProjectUrl(project)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm font-medium hover:text-primary"
-                    >
-                      {project.name}
-                    </a>
-                    {project.status && (
-                      <span className="rounded-sm bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {project.status}
-                      </span>
-                    )}
-                  </div>
-                  {project.description && (
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      {project.description}
-                    </p>
-                  )}
-                  {stack.length > 0 && (
-                    <p className="mt-3 text-[11px] text-muted-foreground">{stack.join(" · ")}</p>
-                  )}
-                </div>
-              </article>
-            </li>
-          );
-        })}
+      <ul className="space-y-3" aria-busy={loading} aria-label="Showcase projects">
+        {loading
+          ? [0, 1, 2].map((item) => <ShowcaseSkeleton key={item} />)
+          : projects.map((project) => {
+              const stack = showcaseProjectStack(project);
+              return (
+                <li key={project.url}>
+                  <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60">
+                    <div className="p-4 sm:p-5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <a
+                          href={showcaseProjectUrl(project)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm font-medium hover:text-primary"
+                        >
+                          {project.name}
+                        </a>
+                        {project.status && (
+                          <span className="rounded-sm bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {project.status}
+                          </span>
+                        )}
+                      </div>
+                      {project.description && (
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          {project.description}
+                        </p>
+                      )}
+                      {stack.length > 0 && (
+                        <p className="mt-3 text-[11px] text-muted-foreground">
+                          {stack.join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
       </ul>
     </section>
   );
@@ -1039,6 +1043,26 @@ function relativeTime(date: Date, nowMs = Date.now()) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function ShowcaseSkeleton() {
+  return (
+    <li
+      className="animate-pulse overflow-hidden rounded-lg border border-border bg-card p-4 sm:p-5"
+      aria-hidden="true"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="h-3.5 w-32 rounded bg-muted" />
+        <div className="h-3 w-12 rounded bg-muted" />
+      </div>
+      <div className="mt-3 h-3 w-full rounded bg-muted" />
+      <div className="mt-2 h-3 w-2/3 rounded bg-muted" />
+      <div className="mt-3.5 flex gap-3">
+        <div className="h-2.5 w-12 rounded bg-muted" />
+        <div className="h-2.5 w-16 rounded bg-muted" />
+      </div>
+    </li>
+  );
 }
 
 function FeedSkeleton() {

@@ -10,10 +10,12 @@ import {
 
 /**
  * Showcase entries from `projects.json` merged with GitHub metadata. The JSON
- * value always wins, so any field can be overridden by hand.
+ * value always wins, so any field can be overridden by hand. `loading` stays
+ * true until the first API response so the page can show skeleton cards.
  */
-export function useShowcaseProjects(): ShowcaseProject[] {
+export function useShowcaseProjects(): { projects: ShowcaseProject[]; loading: boolean } {
   const [meta, setMeta] = useState<Record<string, ShowcaseProjectMeta>>({});
+  const [loading, setLoading] = useState(true);
 
   const repos = useMemo(
     () =>
@@ -25,7 +27,10 @@ export function useShowcaseProjects(): ShowcaseProject[] {
   const query = repos.join(",");
 
   useEffect(() => {
-    if (!query) return;
+    if (!query) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
 
     fetch(`/api/project-meta?repos=${encodeURIComponent(query)}`, { signal: controller.signal })
@@ -33,12 +38,15 @@ export function useShowcaseProjects(): ShowcaseProject[] {
       .then((data: Record<string, ShowcaseProjectMeta>) => setMeta(data))
       .catch(() => {
         // The cards fall back to names derived from the project URLs.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();
   }, [query]);
 
-  return useMemo(
+  const projects = useMemo(
     () =>
       showcaseProjects.map((project) => {
         const repo = repoFromProjectUrl(project.url);
@@ -57,4 +65,6 @@ export function useShowcaseProjects(): ShowcaseProject[] {
       }),
     [meta],
   );
+
+  return { projects, loading };
 }
