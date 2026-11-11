@@ -488,6 +488,7 @@ function FindDevs() {
       <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-0 px-4 sm:px-6 lg:grid-cols-[210px_minmax(0,1fr)_280px] lg:gap-7 lg:px-8">
         <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-68px)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:border-b-0 lg:py-7">
           <div className="hidden lg:block">
+            {/* Project showcase hidden for now.
             <section className="px-3" aria-labelledby="showcase-title">
               <h2 id="showcase-title" className="text-sm font-semibold">
                 Project showcase
@@ -511,6 +512,7 @@ function FindDevs() {
                 />
               </button>
             </section>
+            */}
           </div>
         </aside>
 
