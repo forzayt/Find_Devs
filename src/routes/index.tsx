@@ -493,7 +493,7 @@ function FindDevs() {
                 Project showcase
               </h2>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Open-source projects worth a look, picked by the community.
+                Submitting projects is easy! Making it alive is hard!
               </p>
               <button
                 type="button"
@@ -860,7 +860,7 @@ function ProjectShowcase() {
             Project showcase
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Open-source projects worth a look, picked by the community.
+            Submitting projects is easy! Making it alive is hard!
           </p>
         </div>
         <a
