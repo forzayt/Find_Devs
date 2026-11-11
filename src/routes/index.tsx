@@ -823,6 +823,11 @@ function eventCopy(event: GithubEvent) {
 function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   const copy = eventCopy(event);
   const Icon = copy.icon;
+  const badgeLabel = kindLabel(copy.kind);
+  const title = copy.title.trim();
+  // Skip the title when it only repeats the badge label (e.g. "Pull request"
+  // next to the PULL REQUEST badge) so the card shows it once.
+  const showTitle = title.length > 0 && title.toLowerCase() !== badgeLabel.toLowerCase();
   const branch =
     typeof event.payload.ref === "string" ? event.payload.ref.replace("refs/heads/", "") : "";
   const head = typeof event.payload.head === "string" ? event.payload.head : "";
@@ -874,14 +879,7 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
               {relativeTime(time, now)}
             </time>
           </div>
-          <a
-            href={eventUrl(event)}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 block text-sm font-medium leading-5 hover:text-primary"
-          >
-            {copy.title}
-          </a>
+          {showTitle && <p className="mt-2 text-sm font-medium leading-5">{copy.title}</p>}
           {event.type === "PushEvent" && (
             <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
               {cleanMessage ??
@@ -904,25 +902,17 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
               href={eventUrl(event)}
               target="_blank"
               rel="noreferrer"
-              aria-label={`Open ${kindLabel(copy.kind).toLowerCase()}: ${copy.title}`}
+              aria-label={`Open ${badgeLabel.toLowerCase()}: ${copy.title}`}
               className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium transition-[opacity,transform] hover:opacity-80 active:scale-[0.96] activity-kind activity-kind-${copy.kind}`}
             >
               <Icon className="size-3" />
-              {kindLabel(copy.kind)}
+              {badgeLabel}
             </a>
             {event.type === "PushEvent" && head && (
               <span className="font-mono text-[10px] text-muted-foreground">
                 {head.slice(0, 7)}
               </span>
             )}
-            <a
-              href={eventUrl(event)}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-primary"
-            >
-              View on GitHub <ArrowUpRight className="size-3" />
-            </a>
           </div>
         </div>
       </div>
