@@ -427,60 +427,62 @@ function FindDevs() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-[68px] max-w-[1500px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
-          <a className="flex min-w-0 items-center gap-3" href="/" aria-label="FindDevs home">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Code2 className="size-5" />
-            </span>
-            <span className="text-lg font-bold tracking-normal">
-              Find<span className="text-primary">Devs</span>
-            </span>
-            <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">
-              Tracking the heartbeat of GitHub & see what's devs are cooking.
-            </span>
-          </a>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              onClick={async () => {
-                try {
-                  if (document.fullscreenElement) await document.exitFullscreen();
-                  else await document.documentElement.requestFullscreen();
-                } catch (error) {
-                  console.error("Fullscreen mode is unavailable", error);
-                }
-              }}
-              className="relative flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-[color,background-color,transform] hover:bg-accent hover:text-foreground active:scale-[0.96]"
-            >
-              <Maximize2
-                className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
-                  isFullscreen
-                    ? "scale-[0.25] opacity-0 blur-[4px]"
-                    : "scale-100 opacity-100 blur-0"
-                }`}
-                strokeWidth={1.5}
-              />
-              <Minimize2
-                className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
-                  isFullscreen
-                    ? "scale-100 opacity-100 blur-0"
-                    : "scale-[0.25] opacity-0 blur-[4px]"
-                }`}
-                strokeWidth={1.5}
-              />
-            </button>
-            <a
-              href="https://github.com/forzayt/Find_Devs"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Fork FindDevs on GitHub"
-              className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <GitFork className="size-4" />
+      <header className="sticky top-0 z-20 bg-background/95 py-2 backdrop-blur">
+        <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
+          <div className="flex h-[52px] items-center justify-between gap-5 rounded-2xl border border-border px-4 sm:px-5">
+            <a className="flex min-w-0 items-center gap-3" href="/" aria-label="FindDevs home">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Code2 className="size-5" />
+              </span>
+              <span className="text-lg font-bold tracking-normal">
+                Find<span className="text-primary">Devs</span>
+              </span>
+              <span className="hidden border-l border-border pl-3 text-xs text-muted-foreground sm:inline">
+                Tracking the heartbeat of GitHub & see what's devs are cooking.
+              </span>
             </a>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                onClick={async () => {
+                  try {
+                    if (document.fullscreenElement) await document.exitFullscreen();
+                    else await document.documentElement.requestFullscreen();
+                  } catch (error) {
+                    console.error("Fullscreen mode is unavailable", error);
+                  }
+                }}
+                className="relative flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-[color,background-color,transform] hover:bg-accent hover:text-foreground active:scale-[0.96]"
+              >
+                <Maximize2
+                  className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
+                    isFullscreen
+                      ? "scale-[0.25] opacity-0 blur-[4px]"
+                      : "scale-100 opacity-100 blur-0"
+                  }`}
+                  strokeWidth={1.5}
+                />
+                <Minimize2
+                  className={`absolute size-4 transition-[opacity,scale,filter] duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] ${
+                    isFullscreen
+                      ? "scale-100 opacity-100 blur-0"
+                      : "scale-[0.25] opacity-0 blur-[4px]"
+                  }`}
+                  strokeWidth={1.5}
+                />
+              </button>
+              <a
+                href="https://github.com/forzayt/Find_Devs"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Fork FindDevs on GitHub"
+                className="flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <GitFork className="size-4" />
+              </a>
+            </div>
           </div>
         </div>
       </header>
