@@ -121,11 +121,15 @@ function usable(response: Response): Response {
 export type GithubApiOptions = {
   signal?: AbortSignal | undefined;
   headers?: HeadersInit | undefined;
+  /** Only ever talk to api.github.com; never retry through public proxies. */
+  directOnly?: boolean | undefined;
 };
 
 /**
  * Fetch a resource from api.github.com. Returns the upstream response even
- * when it is rate-limited, so callers can decide how to degrade.
+ * when it is rate-limited, so callers can decide how to degrade. Pass
+ * `directOnly` to stay on the official API instead of retrying through the
+ * public proxy fallbacks.
  */
 export async function fetchGithubApi(
   path: string,
@@ -154,6 +158,11 @@ export async function fetchGithubApi(
     );
   } catch {
     direct = undefined;
+  }
+
+  if (options.directOnly) {
+    if (direct) return direct;
+    throw new Error("GitHub is unreachable right now.");
   }
 
   if (direct && !RETRY_STATUS.has(direct.status)) return direct;

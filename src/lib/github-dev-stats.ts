@@ -104,10 +104,15 @@ function topRepositories(repos: GithubRepoPayload[]): DevStatsRepository[] {
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
-  // Deliberately no AbortSignal: the client aborts its own request when the
-  // hover card closes or the page reloads, and forwarding that abort turns a
+  // Profile data always comes straight from the official REST API
+  // (api.github.com). The public proxy fallbacks used elsewhere are skipped
+  // here on purpose: a hover card must not show third-party cached or mangled
+  // profile data. `GITHUB_TOKEN`/`GITHUB_API_TOKEN` is picked up automatically
+  // by fetchGithubApi, which is the only way to beat the hourly rate limit.
+  // No AbortSignal either: the client aborts its own request when the hover
+  // card closes or the page reloads, and forwarding that abort turns a
   // cancelled hover into an API error.
-  const response = await fetchGithubApi(path);
+  const response = await fetchGithubApi(path, { directOnly: true });
   if (!response.ok) throw new Error(`GitHub responded with ${response.status} for ${path}.`);
   return (await response.json()) as T;
 }
@@ -116,7 +121,7 @@ async function loadFreshStats(login: string): Promise<DevStats | undefined> {
   const [user, repos, events] = await Promise.allSettled([
     fetchJson<GithubUserPayload>(`users/${encodeURIComponent(login)}`),
     fetchJson<GithubRepoPayload[]>(
-      `users/${encodeURIComponent(login)}/repos?per_page=100&sort=pushed`,
+      `users/${encodeURIComponent(login)}/repos?per_page=100&sort=pushed&type=owner`,
     ),
     fetchJson<GithubEventPayload[]>(`users/${encodeURIComponent(login)}/events/public?per_page=100`),
   ]);

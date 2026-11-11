@@ -3,9 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { validLogin } from "@/lib/dev-stats";
 import { loadDevStats } from "@/lib/github-dev-stats";
 
-// Serves the hover-card data for a single developer. GitHub allows 60
-// unauthenticated calls an hour, so the loader caches each login for ten
-// minutes and de-duplicates concurrent hovers.
+// Serves the hover-card data for a single developer. Every request goes to the
+// official REST API on api.github.com (never the proxy fallbacks), so the card
+// only ever shows GitHub's own profile data. GitHub allows 60 unauthenticated
+// calls an hour per IP, so the loader caches each login for ten minutes,
+// de-duplicates concurrent hovers, and honours GITHUB_TOKEN when present.
 export const Route = createFileRoute("/api/dev-stats")({
   server: {
     handlers: {
