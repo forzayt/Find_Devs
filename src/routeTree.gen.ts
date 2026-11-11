@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiDevStatsRouteImport } from './routes/api/dev-stats'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiProjectMetaRouteImport } from './routes/api/project-meta'
 import { Route as ApiRepositoryStarsRouteImport } from './routes/api/repository-stars'
@@ -19,6 +20,11 @@ import { Route as ApiTrendingDevelopersRouteImport } from './routes/api/trending
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDevStatsRoute = ApiDevStatsRouteImport.update({
+  id: '/api/dev-stats',
+  path: '/api/dev-stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
@@ -49,6 +55,7 @@ const ApiTrendingDevelopersRoute = ApiTrendingDevelopersRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/dev-stats': typeof ApiDevStatsRoute
   '/api/events': typeof ApiEventsRoute
   '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/dev-stats': typeof ApiDevStatsRoute
   '/api/events': typeof ApiEventsRoute
   '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/dev-stats': typeof ApiDevStatsRoute
   '/api/events': typeof ApiEventsRoute
   '/api/project-meta': typeof ApiProjectMetaRoute
   '/api/repository-stars': typeof ApiRepositoryStarsRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/dev-stats'
     | '/api/events'
     | '/api/project-meta'
     | '/api/repository-stars'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/dev-stats'
     | '/api/events'
     | '/api/project-meta'
     | '/api/repository-stars'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/dev-stats'
     | '/api/events'
     | '/api/project-meta'
     | '/api/repository-stars'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiDevStatsRoute: typeof ApiDevStatsRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiProjectMetaRoute: typeof ApiProjectMetaRoute
   ApiRepositoryStarsRoute: typeof ApiRepositoryStarsRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dev-stats': {
+      id: '/api/dev-stats'
+      path: '/api/dev-stats'
+      fullPath: '/api/dev-stats'
+      preLoaderRoute: typeof ApiDevStatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events': {
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiDevStatsRoute: ApiDevStatsRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiProjectMetaRoute: ApiProjectMetaRoute,
   ApiRepositoryStarsRoute: ApiRepositoryStarsRoute,

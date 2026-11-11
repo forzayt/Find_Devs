@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DevStatsHoverCard, DevStatsTrigger } from "@/components/dev-stats-card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { TrendingDeveloper } from "@/lib/github-trending-developers";
@@ -676,25 +677,39 @@ function FindDevs() {
             ) : developers.length ? (
               <ul className="space-y-3">
                 {developers.slice(0, 5).map((developer) => (
-                  <li key={developer.login} className="flex items-center gap-2.5">
-                    <Avatar className="size-8">
-                      <AvatarImage src={developer.avatarUrl} alt="" />
-                      <AvatarFallback>{developer.login.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <a
-                        href={`https://github.com/${encodeURIComponent(developer.login)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block truncate text-xs font-medium hover:text-primary"
-                      >
-                        {developer.name || developer.login}
-                      </a>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        @{developer.login}
-                        {developer.popularRepository ? ` · ${developer.popularRepository}` : ""}
-                      </p>
-                    </div>
+                  <li key={developer.login}>
+                    <DevStatsHoverCard
+                      login={developer.login}
+                      avatarUrl={developer.avatarUrl}
+                      align="end"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <DevStatsTrigger>
+                          <Avatar className="size-8">
+                            <AvatarImage src={developer.avatarUrl} alt="" />
+                            <AvatarFallback>
+                              {developer.login.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </DevStatsTrigger>
+                        <div className="min-w-0">
+                          <DevStatsTrigger>
+                            <a
+                              href={`https://github.com/${encodeURIComponent(developer.login)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate text-xs font-medium hover:text-primary"
+                            >
+                              {developer.name || developer.login}
+                            </a>
+                          </DevStatsTrigger>
+                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                            @{developer.login}
+                            {developer.popularRepository ? ` · ${developer.popularRepository}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </DevStatsHoverCard>
                   </li>
                 ))}
               </ul>
@@ -937,83 +952,89 @@ function ActivityCard({ event, now }: { event: GithubEvent; now: number }) {
   const time = useMemo(() => new Date(Date.now() - simulatedAgeMs(event.id)), [event.id]);
   return (
     <article className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-ring/60 animate-in fade-in slide-in-from-top-1 duration-300">
-      <div className="flex items-start gap-3.5 p-4 sm:p-5">
-        <a
-          href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`${event.actor.login} on GitHub`}
-          className="mt-0.5 shrink-0"
-        >
-          <Avatar className="size-9">
-            <AvatarImage src={event.actor.avatar_url} alt="" />
-            <AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-        </a>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[13px] leading-5">
+      <DevStatsHoverCard login={event.actor.login} avatarUrl={event.actor.avatar_url}>
+        <div className="flex items-start gap-3.5 p-4 sm:p-5">
+          <DevStatsTrigger>
             <a
               href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold hover:text-primary"
+              aria-label={`${event.actor.login} on GitHub`}
+              className="mt-0.5 shrink-0"
             >
-              {event.actor.login}
+              <Avatar className="size-9">
+                <AvatarImage src={event.actor.avatar_url} alt="" />
+                <AvatarFallback>{event.actor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
             </a>
-            <span className="text-muted-foreground">{copy.verb}</span>
-            <a
-              href={repoUrl(event.repo.name)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-primary hover:underline"
-            >
-              {event.repo.name}
-            </a>
-            <time
-              className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground"
-              dateTime={time.toISOString()}
-              title={time.toLocaleString()}
-            >
-              {relativeTime(time, now)}
-            </time>
-          </div>
-          {showTitle && <p className="mt-2 text-sm font-medium leading-5">{copy.title}</p>}
-          {event.type === "PushEvent" && (
-            <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {cleanMessage ??
-                (head
-                  ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}`
-                  : branch
-                    ? `Updates to ${branch}`
-                    : "Pushed new changes")}
-            </p>
-          )}
-          {event.type === "PullRequestEvent" && typeof event.payload.action === "string" && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {event.payload.action === "opened"
-                ? "A new contribution is ready for review."
-                : "Pull request activity"}
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <a
-              href={eventUrl(event)}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open ${badgeLabel.toLowerCase()}: ${copy.title}`}
-              className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium transition-[opacity,transform] hover:opacity-80 active:scale-[0.96] activity-kind activity-kind-${copy.kind}`}
-            >
-              <Icon className="size-3" />
-              {badgeLabel}
-            </a>
-            {event.type === "PushEvent" && head && (
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {head.slice(0, 7)}
-              </span>
+          </DevStatsTrigger>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[13px] leading-5">
+              <DevStatsTrigger>
+                <a
+                  href={`https://github.com/${encodeURIComponent(event.actor.login)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold hover:text-primary"
+                >
+                  {event.actor.login}
+                </a>
+              </DevStatsTrigger>
+              <span className="text-muted-foreground">{copy.verb}</span>
+              <a
+                href={repoUrl(event.repo.name)}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                {event.repo.name}
+              </a>
+              <time
+                className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground"
+                dateTime={time.toISOString()}
+                title={time.toLocaleString()}
+              >
+                {relativeTime(time, now)}
+              </time>
+            </div>
+            {showTitle && <p className="mt-2 text-sm font-medium leading-5">{copy.title}</p>}
+            {event.type === "PushEvent" && (
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                {cleanMessage ??
+                  (head
+                    ? `Commit ${head.slice(0, 7)}${branch ? ` · ${branch}` : ""}`
+                    : branch
+                      ? `Updates to ${branch}`
+                      : "Pushed new changes")}
+              </p>
             )}
+            {event.type === "PullRequestEvent" && typeof event.payload.action === "string" && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {event.payload.action === "opened"
+                  ? "A new contribution is ready for review."
+                  : "Pull request activity"}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <a
+                href={eventUrl(event)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${badgeLabel.toLowerCase()}: ${copy.title}`}
+                className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-medium transition-[opacity,transform] hover:opacity-80 active:scale-[0.96] activity-kind activity-kind-${copy.kind}`}
+              >
+                <Icon className="size-3" />
+                {badgeLabel}
+              </a>
+              {event.type === "PushEvent" && head && (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {head.slice(0, 7)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </DevStatsHoverCard>
     </article>
   );
 }
