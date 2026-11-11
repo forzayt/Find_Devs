@@ -568,7 +568,7 @@ function FindDevs() {
           )}
         </section>
 
-        <aside className="hidden min-w-0 space-y-7 py-8 lg:block">
+        <aside className="hidden min-w-0 space-y-7 py-8 lg:sticky lg:top-[68px] lg:block lg:max-h-[calc(100vh-68px)] lg:self-start lg:overflow-y-auto lg:overscroll-contain">
           <section aria-labelledby="trending-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="trending-title" className="text-sm font-semibold">
