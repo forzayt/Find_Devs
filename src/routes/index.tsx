@@ -14,6 +14,7 @@ import {
   Minimize2,
   Pause,
   Rocket,
+  Sparkles,
   Star,
   Users,
 } from "lucide-react";
@@ -22,6 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { TrendingDeveloper } from "@/lib/github-trending-developers";
 import type { TrendingRepository } from "@/lib/github-trending";
+import {
+  projectSubmissionUrl,
+  showcaseProjectUrl,
+  showcaseProjects,
+} from "@/lib/project-showcase";
 
 type GithubEvent = {
   id: string;
@@ -479,9 +485,47 @@ function FindDevs() {
       </header>
 
       <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-0 px-4 sm:px-6 lg:grid-cols-[210px_minmax(0,1fr)_280px] lg:gap-7 lg:px-8">
-        <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:h-[calc(100vh-68px)] lg:border-b-0 lg:py-7">
+        <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-68px)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:border-b-0 lg:py-7">
           <div className="hidden lg:block">
-            <section className="px-3" aria-labelledby="contribute-title">
+            <section className="px-3" aria-labelledby="showcase-title">
+              <div className="flex items-center justify-between">
+                <h2 id="showcase-title" className="text-sm font-semibold">
+                  Project showcase
+                </h2>
+                <Sparkles className="size-4 text-muted-foreground" />
+              </div>
+              <ul className="mt-3 space-y-3">
+                {showcaseProjects.map((project) => (
+                  <li key={project.repo}>
+                    <a
+                      href={showcaseProjectUrl(project)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block truncate text-xs font-medium hover:text-primary"
+                    >
+                      {project.name}
+                    </a>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                      {project.description}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={projectSubmissionUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+              >
+                Submit your project
+                <ArrowUpRight className="size-3" />
+              </a>
+            </section>
+
+            <section
+              className="mt-6 border-t border-border px-3 pt-6"
+              aria-labelledby="contribute-title"
+            >
               <h2 id="contribute-title" className="text-sm font-semibold">
                 Looking to contribute?
               </h2>
