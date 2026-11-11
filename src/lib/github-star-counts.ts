@@ -1,3 +1,5 @@
+import { fetchGithubApi } from "@/lib/github-api";
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 type CachedStarCount = {
@@ -15,14 +17,7 @@ async function loadRepositoryStarCount(name: string, signal?: AbortSignal) {
   const cached = starCountCache.get(name);
   if (cached && cached.expiresAt > Date.now()) return cached.count;
 
-  const response = await fetch(`https://api.github.com/repos/${name}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "user-agent": "FindDevs/1.0 (+https://github.com/forzayt/Find_Devs)",
-      "x-github-api-version": "2022-11-28",
-    },
-    signal,
-  });
+  const response = await fetchGithubApi(`repos/${name}`, { signal });
   if (!response.ok) throw new Error(`GitHub repository lookup returned ${response.status}.`);
 
   const body = (await response.json()) as { stargazers_count?: number };
