@@ -1,18 +1,47 @@
 import { useEffect, useState } from "react";
 
 import type { DevStats } from "@/lib/dev-stats";
+import { loadUnghUser, loadUnghUserRepos, type UnghRepo } from "@/lib/ungh";
 
 const cache = new Map<string, DevStats>();
 const inflight = new Map<string, Promise<DevStats | undefined>>();
 
-type Status = "idle" | "loading" | "ready" | "error";
+function buildStats(login: string, user: Awaited<ReturnType<typeof loadUnghUser>>, repos: UnghRepo[]) {
+  const byStars = [...repos].sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0));
+  const latest = [...repos]
+    .filter((repo) => repo.pushedAt)
+    .sort((a, b) => Date.parse(b.pushedAt) - Date.parse(a.pushedAt))[0];
+
+  return {
+    login: user?.username ?? login,
+    name: user?.name ?? undefined,
+    avatarUrl: user?.avatar ?? undefined,
+    twitter: user?.twitter ?? undefined,
+    publicRepos: repos.length,
+    totalStars: repos.reduce((sum, repo) => sum + (Number(repo.stars) || 0), 0),
+    topRepositories: byStars.slice(0, 3).map((repo) => ({
+      name: repo.name,
+      url: `https://github.com/${repo.repo}`,
+      stars: Number(repo.stars) || 0,
+      forks: Number(repo.forks) || 0,
+      description: repo.description ?? undefined,
+      pushedAt: repo.pushedAt,
+    })),
+    latestPush: latest ? { repository: latest.name, at: latest.pushedAt } : undefined,
+  } satisfies DevStats;
+}
+
+async function loadStats(login: string): Promise<DevStats | undefined> {
+  const [user, repos] = await Promise.all([loadUnghUser(login), loadUnghUserRepos(login)]);
+  if (!user && !repos.length) return undefined;
+  return buildStats(login, user, repos);
+}
 
 function fetchStats(login: string): Promise<DevStats | undefined> {
   const pending = inflight.get(login);
   if (pending) return pending;
 
-  const request = fetch(`/api/dev-stats?login=${encodeURIComponent(login)}`, { cache: "no-store" })
-    .then((response) => (response.ok ? (response.json() as Promise<DevStats>) : undefined))
+  const request = loadStats(login)
     .then((stats) => {
       if (stats) cache.set(login, stats);
       return stats;
@@ -25,9 +54,9 @@ function fetchStats(login: string): Promise<DevStats | undefined> {
 }
 
 /**
- * Developer stats for the hover card. Nothing is requested until `enabled`
- * flips to true (the card opens), and results are cached per login for the
- * lifetime of the tab.
+ * Developer stats for the hover card, fetched straight from ungh.cc (cached,
+ * unlimited GitHub API). Nothing is requested until `enabled` flips to true
+ * (the card opens), and results are cached per login for the tab's lifetime.
  */
 export function useDevStats(login: string, enabled: boolean) {
   const key = login.toLowerCase();
@@ -35,7 +64,7 @@ export function useDevStats(login: string, enabled: boolean) {
     const cached = cache.get(key);
     return cached ? { key, stats: cached } : undefined;
   });
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
     if (!enabled) return;
@@ -49,19 +78,15 @@ export function useDevStats(login: string, enabled: boolean) {
 
     let active = true;
     setStatus("loading");
-    void fetchStats(key)
-      .then((stats) => {
-        if (!active) return;
-        if (stats) {
-          setEntry({ key, stats });
-          setStatus("ready");
-        } else {
-          setStatus("error");
-        }
-      })
-      .catch(() => {
-        if (active) setStatus("error");
-      });
+    void fetchStats(key).then((stats) => {
+      if (!active) return;
+      if (stats) {
+        setEntry({ key, stats });
+        setStatus("ready");
+      } else {
+        setStatus("error");
+      }
+    });
 
     return () => {
       active = false;

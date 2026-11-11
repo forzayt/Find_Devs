@@ -1,10 +1,11 @@
-import { CircleDot, GitCommitHorizontal, GitPullRequest, Star } from "lucide-react";
+import { GitCommitHorizontal, Star } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useDevStats } from "@/hooks/use-dev-stats";
 import type { DevStats } from "@/lib/dev-stats";
+import { relativeTime } from "@/lib/relative-time";
 
 type DevStatsHoverCardProps = {
   login: string;
@@ -15,7 +16,8 @@ type DevStatsHoverCardProps = {
 
 /**
  * Provides the developer summary for every `DevStatsTrigger` inside it, so the
- * avatar and the username can share one card. Data is fetched on first open.
+ * avatar and the username can share one card. Data comes from ungh.cc and is
+ * fetched on first open.
  */
 export function DevStatsHoverCard({
   login,
@@ -51,7 +53,6 @@ export function DevStatsTrigger({ children }: { children: ReactElement }) {
 
 function DevStatsBody({ stats, avatarUrl }: { stats: DevStats; avatarUrl?: string | undefined }) {
   const image = stats.avatarUrl ?? avatarUrl;
-  const weekly = stats.contributions;
 
   return (
     <div className="space-y-3.5 p-4">
@@ -64,88 +65,21 @@ function DevStatsBody({ stats, avatarUrl }: { stats: DevStats; avatarUrl?: strin
           <p className="truncate text-sm font-semibold leading-5">{stats.name || stats.login}</p>
           <p className="truncate text-[11px] text-muted-foreground">@{stats.login}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {typeof stats.followers === "number" && (
-              <span>{stats.followers.toLocaleString()} followers</span>
-            )}
-            {typeof stats.followers === "number" &&
-              typeof stats.publicRepos === "number" &&
-              " · "}
-            {typeof stats.publicRepos === "number" && (
-              <span>{stats.publicRepos.toLocaleString()} public repos</span>
-            )}
+            {stats.publicRepos.toLocaleString()} repos · {stats.totalStars.toLocaleString()} stars
+            {stats.twitter ? ` · @${stats.twitter}` : ""}
           </p>
         </div>
       </div>
 
-      {stats.bio && (
-        <p className="line-clamp-2 text-[11px] leading-5 text-muted-foreground">{stats.bio}</p>
+      {stats.latestPush && (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+          <GitCommitHorizontal className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            Last push {relativeTime(new Date(stats.latestPush.at))} to{" "}
+            <span className="font-medium text-foreground/80">{stats.latestPush.repository}</span>
+          </p>
+        </div>
       )}
-
-      <div className="rounded-lg border border-border bg-muted/40 p-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            This week
-          </span>
-          <span className="text-lg font-semibold leading-none tabular-nums">
-            {typeof stats.contributionsThisWeek === "number"
-              ? stats.contributionsThisWeek.toLocaleString()
-              : "—"}
-          </span>
-        </div>
-        {weekly ? (
-          <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span
-              className="inline-flex items-center gap-1"
-              title={`${weekly.commits.toLocaleString()} commits pushed`}
-            >
-              <GitCommitHorizontal className="size-3" strokeWidth={1.5} />
-              {weekly.commits.toLocaleString()}
-            </span>
-            <span
-              className="inline-flex items-center gap-1"
-              title={`${weekly.pullRequests.toLocaleString()} pull requests opened`}
-            >
-              <GitPullRequest className="size-3" strokeWidth={1.5} />
-              {weekly.pullRequests.toLocaleString()}
-            </span>
-            <span
-              className="inline-flex items-center gap-1"
-              title={`${weekly.issues.toLocaleString()} issues opened`}
-            >
-              <CircleDot className="size-3" strokeWidth={1.5} />
-              {weekly.issues.toLocaleString()}
-            </span>
-            <span className="ml-auto text-[10px] text-muted-foreground/80">public activity</span>
-          </div>
-        ) : (
-          <p className="mt-2 text-[11px] text-muted-foreground">Activity unavailable right now.</p>
-        )}
-        {stats.partial && (
-          <p className="mt-1.5 text-[10px] text-muted-foreground/80">
-            Some GitHub data was unavailable.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Primary languages
-        </p>
-        {stats.languages.length ? (
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {stats.languages.map((language) => (
-              <span
-                key={language}
-                className="rounded-sm border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-foreground/80"
-              >
-                {language}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">No public languages yet.</p>
-        )}
-      </div>
 
       <div>
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -164,9 +98,9 @@ function DevStatsBody({ stats, avatarUrl }: { stats: DevStats; avatarUrl?: strin
                 >
                   {repository.name}
                 </a>
-                {repository.language && (
+                {repository.pushedAt && (
                   <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {repository.language}
+                    {relativeTime(new Date(repository.pushedAt))}
                   </span>
                 )}
                 <span
@@ -236,11 +170,7 @@ function DevStatsSkeleton({
           <div className="h-2.5 w-16 rounded bg-muted" />
         </div>
       </div>
-      <div className="h-16 rounded-lg bg-muted" />
-      <div className="space-y-1.5">
-        <div className="h-2.5 w-20 rounded bg-muted" />
-        <div className="h-3 w-32 rounded bg-muted" />
-      </div>
+      <div className="h-10 rounded-lg bg-muted" />
       <div className="space-y-1.5">
         <div className="h-2.5 w-24 rounded bg-muted" />
         <div className="h-3 w-full rounded bg-muted" />

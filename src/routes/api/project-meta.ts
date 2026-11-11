@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { fetchGithubApi } from "@/lib/github-api";
-import { deriveProjectMeta, type GithubRepositoryPayload } from "@/lib/project-metadata";
+import { deriveProjectMeta } from "@/lib/project-metadata";
 import type { ShowcaseProjectMeta } from "@/lib/project-showcase";
+import { loadUnghRepository } from "@/lib/ungh";
 
 const MAX_REPOS = 20;
 // Dev reloads and repeated mounts hammer this endpoint, so cache each repo
-// briefly and reuse the last good value when GitHub is unreachable.
+// briefly and reuse the last good value when ungh.cc is unreachable.
 const CACHE_TTL_MS = 60_000;
 
 type CachedMeta = { meta: ShowcaseProjectMeta; expiresAt: number };
@@ -21,19 +21,18 @@ async function loadMeta(repo: string): Promise<ShowcaseProjectMeta | undefined> 
   const cached = metaCache.get(repo);
   if (cached && cached.expiresAt > Date.now()) return cached.meta;
 
-  try {
-    // Intentionally no request.signal: the client aborts on every navigation
-    // and HMR reload, and forwarding that turns into "Error: aborted" failures.
-    const response = await fetchGithubApi(`repos/${repo}`);
-    if (!response.ok) return cached?.meta;
+  // Repository metadata comes from ungh.cc's cached GitHub API, so this never
+  // touches the rate-limited api.github.com quota.
+  const repository = await loadUnghRepository(repo);
+  if (!repository) return cached?.meta;
 
-    const payload = (await response.json()) as GithubRepositoryPayload;
-    const meta = deriveProjectMeta(payload);
-    metaCache.set(repo, { meta, expiresAt: Date.now() + CACHE_TTL_MS });
-    return meta;
-  } catch {
-    return cached?.meta;
-  }
+  const meta = deriveProjectMeta({
+    name: repository.name,
+    full_name: repository.repo,
+    description: repository.description,
+  });
+  metaCache.set(repo, { meta, expiresAt: Date.now() + CACHE_TTL_MS });
+  return meta;
 }
 
 export const Route = createFileRoute("/api/project-meta")({

@@ -1,30 +1,23 @@
-/** Shared shape of the developer summary shown in the hover card. Kept in a
- * dependency-free module so the client can import it without pulling in the
- * server-side GitHub loader. */
+/** Shape of the developer summary shown in the hover card, built entirely
+ * from the cached ungh.cc GitHub API. Kept dependency-free so the client can
+ * import it without pulling in any data-fetching code. */
 
 export type DevStats = {
   login: string;
   name: string | undefined;
   avatarUrl: string | undefined;
-  bio: string | undefined;
-  followers: number | undefined;
-  publicRepos: number | undefined;
-  languages: string[];
-  contributionsThisWeek: number | undefined;
-  contributions: { commits: number; pullRequests: number; issues: number } | undefined;
+  twitter: string | undefined;
+  publicRepos: number;
+  totalStars: number;
   topRepositories: DevStatsRepository[];
-  /** True when one of the GitHub calls failed, so the card can say so. */
-  partial: boolean;
+  latestPush: { repository: string; at: string } | undefined;
 };
 
 export type DevStatsRepository = {
   name: string;
   url: string;
   stars: number;
-  language: string | undefined;
+  forks: number;
   description: string | undefined;
+  pushedAt: string | undefined;
 };
-
-export function validLogin(login: string) {
-  return /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(login);
-}
