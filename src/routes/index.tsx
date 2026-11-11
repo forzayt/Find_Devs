@@ -13,7 +13,6 @@ import {
   Maximize2,
   Minimize2,
   Pause,
-  Radio,
   Rocket,
   Star,
   Users,
@@ -482,13 +481,23 @@ function FindDevs() {
       <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-0 px-4 sm:px-6 lg:grid-cols-[210px_minmax(0,1fr)_280px] lg:gap-7 lg:px-8">
         <aside className="border-b border-border py-4 lg:sticky lg:top-[68px] lg:h-[calc(100vh-68px)] lg:border-b-0 lg:py-7">
           <div className="hidden lg:block">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
-              ON FINDDEVS
-            </p>
-            <div className="mt-3 flex items-start gap-3 px-3 text-xs leading-5 text-muted-foreground">
-              <Radio className="mt-0.5 size-4 shrink-0 text-primary" />
-              <p>Open feed. Real work. Straight from GitHub.</p>
-            </div>
+            <section className="px-3" aria-labelledby="contribute-title">
+              <h2 id="contribute-title" className="text-sm font-semibold">
+                Looking to contribute?
+              </h2>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Discover open-source projects that match your interests and skills.
+              </p>
+              <a
+                href="https://findopensource.dev/explore"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
+              >
+                Find a project
+                <ArrowUpRight className="size-3.5" strokeWidth={2} />
+              </a>
+            </section>
           </div>
         </aside>
 
@@ -670,24 +679,6 @@ function FindDevs() {
             ) : (
               <SidebarEmpty>GitHub Trending Developers is unavailable right now.</SidebarEmpty>
             )}
-          </section>
-
-          <section className="border-t border-border pt-6" aria-labelledby="contribute-title">
-            <h2 id="contribute-title" className="text-sm font-semibold">
-              Looking to contribute?
-            </h2>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Discover open-source projects that match your interests and skills.
-            </p>
-            <a
-              href="https://findopensource.dev/explore"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-[color,background-color,transform] duration-150 hover:bg-foreground/85 active:scale-[0.96]"
-            >
-              Find a project
-              <ArrowUpRight className="size-3.5" strokeWidth={2} />
-            </a>
           </section>
         </aside>
       </div>
